@@ -1650,7 +1650,7 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  When FAILED is returned, view is left in an indeterminate state. */
-static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view)
+static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view, bool bOnlyDisconnectRegularTxs = false)
 {
     bool fClean = true;
 
@@ -1678,13 +1678,19 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
     //         return DISCONNECT_FAILED;
     //     }
     // }
-    //TODO use the read StakeNode info
+    //TODO use the read StakeNode info, in case only Regular transactions are disconnected we won't need to do it
 
     // undo transactions in reverse order
     for (int i = block.vtx.size() - 1; i >= 0; i--) {
         const CTransaction &tx = *(block.vtx[i]);
+
         uint256 hash = tx.GetHash();
         bool is_coinbase = tx.IsCoinBase();
+
+        if (!is_coinbase && bOnlyDisconnectRegularTxs) {
+            const auto& txClass = ParseTxClass(tx);
+            if (txClass != TX_Regular) continue;
+        }
 
         // Check that all outputs are available and match the outputs in the block itself
         // exactly.
@@ -1716,10 +1722,40 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
         }
     }
 
-    // move best block pointer to prevout block
-    view.SetBestBlock(pindex->pprev->GetBlockHash());
+    if (!bOnlyDisconnectRegularTxs) {
+        // move best block pointer to prevout block
+        view.SetBestBlock(pindex->pprev->GetBlockHash());
+    }
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
+}
+
+static bool DisconnectDisapprovedTip(CValidationState& state, const CChainParams& chainparams, DisconnectedBlockTransactions *disconnectpool)
+{
+    CBlockIndex *pindexDisapproved = chainActive.Tip();
+    assert(pindexDisapproved);
+    // Read block from disk.
+    std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
+    CBlock& block = *pblock;
+    if (!ReadBlockFromDisk(block, pindexDisapproved, chainparams.GetConsensus()))
+        return AbortNode(state, "Failed to read block");
+    CCoinsViewCache view(pcoinsTip);
+    assert(view.GetBestBlock() == pindexDisapproved->GetBlockHash());
+    if (DisconnectBlock(block, pindexDisapproved, view, true /*bOnlyDisconnectRegularTxs*/) != DISCONNECT_OK)
+        return error("DisconnectDisapprovedTip(): DisconnectBlock %s failed", pindexDisapproved->GetBlockHash().ToString());
+    bool flushed = view.Flush();
+    assert(flushed);
+
+    assert (disconnectpool != nullptr);
+
+    for ( auto it = block.vtx.crbegin(); it != block.vtx.crend(); ++it ) {
+        if (TX_Regular == ParseTxClass(**it))
+            disconnectpool->addTransaction(*it);
+        else // once we find a stake transaction we can break, we want to skip all stake txs and coinbase
+            break;
+    }
+
+    return true;
 }
 
 void static FlushBlockFile(bool fFinalize = false)
@@ -1983,6 +2019,16 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
 
+    if (pindex->nHeight > 1 && pindex->nVoteBits != 1) {
+        DisconnectedBlockTransactions disconnectedPool;
+        if (!DisconnectDisapprovedTip(state,chainparams, &disconnectedPool)){
+            UpdateMempoolForReorg(disconnectedPool, false);
+        }
+        else {
+            UpdateMempoolForReorg(disconnectedPool, true); //add the disconnected back to mempool
+        }
+    }
+
     // Get the script flags for this block
     unsigned int flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
 
@@ -2124,7 +2170,6 @@ static bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockInd
     else{
         assert(pindex->pprev != nullptr);
         assert(pindex->pprev->pstakeNode != nullptr);
-
         pindex->pstakeNode = FetchStakeNode(pindex, chainparams.GetConsensus() );
     }
     // if(pindex->GetStakePos().IsNull()){
@@ -3182,21 +3227,21 @@ bool CheckBlock(const CBlock& block, CValidationState& state, const Consensus::P
 
     // Before stake validation begins, a block must not contain any votes or revocations, its vote bits
     // must be 0x0001, and its ticket lottery state must be all zeroes.
-    // if (nBlockHeight < consensusParams.nStakeValidationHeight) {
-    //     if (numVotes > 0)
-    //         return state.DoS(50, false, REJECT_INVALID, "votes-too-early", false, "vote transactions present before stake validation time");
+    if (blockHeight < consensusParams.nStakeValidationHeight) {
+        if (numVotes > 0)
+            return state.DoS(50, false, REJECT_INVALID, "votes-too-early", false, "vote transactions present before stake validation time");
 
-    //     if (numRevocations > 0)
-    //         return state.DoS(50, false, REJECT_INVALID, "revocations-too-early", false, "revocation transactions present before stake validation time");
+        if (numRevocations > 0)
+            return state.DoS(50, false, REJECT_INVALID, "revocations-too-early", false, "revocation transactions present before stake validation time");
 
-    //     if (block.nVoteBits != 1)   // before stake validation height, blocks must all have voteBits set to 1 (simple approval)
-    //         return state.DoS(50, false, REJECT_INVALID, "voteBits-too-early", false, "voteBits present before stake validation time");
+        if (block.nVoteBits != 1)   // before stake validation height, blocks must all have voteBits set to 1 (simple approval)
+            return state.DoS(50, false, REJECT_INVALID, "voteBits-too-early", false, "voteBits present before stake validation time");
 
-    //     StakeState earlyLotteryState;
-    //     std::fill(earlyLotteryState.begin(), earlyLotteryState.end(), 0);
-    //     if (block.ticketLotteryState != earlyLotteryState)
-    //         return state.DoS(50, false, REJECT_INVALID, "lottery-too-early", false, "ticket lottery state non-zero before stake validation time");
-    // }
+        StakeState earlyLotteryState;
+        std::fill(earlyLotteryState.begin(), earlyLotteryState.end(), 0);
+        if (block.ticketLotteryState != earlyLotteryState)
+            return state.DoS(50, false, REJECT_INVALID, "lottery-too-early", false, "ticket lottery state non-zero before stake validation time");
+    }
 
     // Check that the number of votes in a block is within limits
     if (blockHeight >= consensusParams.nStakeValidationHeight)
@@ -3432,21 +3477,22 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationSta
         auto report = strprintf("incorrect stake difficulty in a block: expected %.2f, found %.2f", expectedStakeDifficulty / (float)COIN, block.nStakeDifficulty / (float)COIN);
         return state.DoS(100, false, REJECT_INVALID, "bad-stakediff", false, report);
     }
-    /*  TODO uncomment once we have pstakeNode available and stable
 
-    // Ensure the header commits to the correct pool size based on its position within the chain.
-    auto expectedTicketPoolSize = pindexPrev->pstakeNode->PoolSize();
-    if (block.nTicketPoolSize != (uint32_t) expectedTicketPoolSize) {
-        auto report = strprintf("block ticket pool size does not match the expected ticket pool size: expected %u, found %u", expectedTicketPoolSize, block.nTicketPoolSize);
-        return state.DoS(100, false, REJECT_INVALID, "bad-poolsize", false, report);
+    if (pindexPrev->pstakeNode != nullptr) {
+        // Ensure the header commits to the correct pool size based on its position within the chain.
+        auto expectedTicketPoolSize = pindexPrev->pstakeNode->PoolSize();
+        if (block.nTicketPoolSize != (uint32_t)expectedTicketPoolSize) {
+            auto report = strprintf("block ticket pool size does not match the expected ticket pool size: expected %u, found %u", expectedTicketPoolSize, block.nTicketPoolSize);
+            return state.DoS(100, false, REJECT_INVALID, "bad-poolsize", false, report);
+        }
+
+        // Ensure the header commits to the correct lottery state based on its position within the chain.
+        auto expectedTicketLotteryState = pindexPrev->pstakeNode->FinalState();
+        if (block.ticketLotteryState != expectedTicketLotteryState)
+            return state.DoS(100, false, REJECT_INVALID, "bad-lotterystate", false, "block ticket lottery state does not match the expected ticket lottery state");
     }
 
-    // Ensure the header commits to the correct lottery state based on its position within the chain.
-    auto expectedTicketLotteryState = pindexPrev->pstakeNode->FinalState();
-    if (block.ticketLotteryState != expectedTicketLotteryState)
-        return state.DoS(100, false, REJECT_INVALID, "bad-lotterystate", false, "block ticket lottery state does not match the expected ticket lottery state");
-    */
-   // Check against checkpoints
+    // Check against checkpoints
     if (fCheckpointsEnabled) {
         // Don't accept any forks from the main chain prior to last checkpoint.
         // GetLastCheckpoint finds the last checkpoint in MapCheckpoints that's in our
@@ -4224,6 +4270,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
                 if (!UndoReadFromDisk(undo, pos, pindex->pprev->GetBlockHash()))
                     return error("VerifyDB(): *** found bad undo data at %d, hash=%s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
             }
+
             // StakeNode stake(chainparams.GetConsensus());
             // pos = pindex->GetStakePos();
             // if (!pos.IsNull()) {
@@ -5112,10 +5159,9 @@ std::shared_ptr<StakeNode> FetchStakeNode(CBlockIndex* pindex, const Consensus::
         // Populate the prunable ticket information as needed.
         MaybeFetchTicketInfo(pindex,params);
 
-        auto stakeNode = pindex->pprev->pstakeNode->ConnectNode(
+        auto stakeNode = pindex->pprev->pstakeNode->ConnectNode( pindex->LotteryIV(),
             pindex->ticketsVoted, pindex->ticketsRevoked, *pindex->newTickets);
-        // stakeNode, err := node.parent.stakeNode.ConnectNode(node.lotteryIV(),
-        // 		node.ticketsVoted, node.ticketsRevoked, node.newTickets)
+
         pindex->pstakeNode = stakeNode;
 
         return stakeNode;
@@ -5155,11 +5201,8 @@ std::shared_ptr<StakeNode> FetchStakeNode(CBlockIndex* pindex, const Consensus::
         // Generate the previous stake node by starting with the child stake
         // node and undoing the modifications caused by the stake details in
         // the previous block.
-        // const auto parentUtds = this->databaseUndoUpdate; //TODO get correct one from height-1
-        // const auto parentTickets = this->databaseBlockTickets; //TODO get correct one from height-1
-        auto stakeNode = it->pstakeNode->DisconnectNode(prev->pstakeNode->UndoData(), prev->pstakeNode->NewTickets());
-        // stakeNode, err := n.stakeNode.DisconnectNode(prev.lotteryIV(), nil,
-        // nil, dbTx)
+        auto stakeNode = it->pstakeNode->DisconnectNode(prev->LotteryIV(),prev->pstakeNode->UndoData(), prev->pstakeNode->NewTickets());
+        // stakeNode, err := n.stakeNode.DisconnectNode(prev.lotteryIV(), nil, nil, dbTx)
         prev->pstakeNode = stakeNode;
     }
 
@@ -5188,11 +5231,9 @@ std::shared_ptr<StakeNode> FetchStakeNode(CBlockIndex* pindex, const Consensus::
 
         // Generate the stake node by applying the stake details in the current
         // block to the previous stake node.
-        auto stakeNode = it->pprev->pstakeNode->ConnectNode(
+        auto stakeNode = it->pprev->pstakeNode->ConnectNode( it->LotteryIV(),
             it->ticketsVoted, it->ticketsRevoked, *it->newTickets);
         it->pstakeNode = stakeNode;
-        // 	stakeNode, err := n.parent.stakeNode.ConnectNode(n.lotteryIV(),
-        // 		n.ticketsVoted, n.ticketsRevoked, n.newTickets)
     }
 
     return pindex->pstakeNode;
