@@ -482,10 +482,8 @@ CBlock Generator::NextBlock(const std::string& blockName
 
     if (munger){
         mempool.clear();
-        const auto& mungerTxs = munger(block);
-        block.vtx.resize(1);
-        for (const CMutableTransaction& tx : mungerTxs)
-            block.vtx.push_back(MakeTransactionRef(tx));
+        // calling the munger which can change the block
+        munger(block);
 
         // Re-create coinbase transaction to be able to generate a new commitment
         CMutableTransaction coinbaseTx;

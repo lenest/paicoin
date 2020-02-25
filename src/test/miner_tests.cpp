@@ -1382,11 +1382,11 @@ BOOST_FIXTURE_TEST_CASE( FakeChainGenerator_stake_REGTEST, Generator)
 
     auto MinVotes = [this](const CBlock& b)
     {
+        std::vector<CMutableTransaction> txns;
         const auto& winners = Tip()->pstakeNode->Winners();
         const auto& majority = (ConsensusParams().nTicketsPerBlock / 2) + 1;
-
         for(int i = 0; txns.size() < majority && i < winners.size(); ++i) {
-            const auto& voteTx = CreateVoteTx(*Tip(), winners[i]);
+            const auto& voteTx = CreateVoteTx(Tip()->GetBlockHash(),Tip()->nHeight, winners[i]);
             txns.push_back(voteTx);
         }
         return txns;
