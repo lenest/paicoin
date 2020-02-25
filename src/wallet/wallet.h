@@ -643,6 +643,36 @@ private:
 };
 
 
+class CWalletError {
+public:
+    enum Code {
+        SUCCESSFUL                = 0,
+        TYPE_ERROR                = -3,
+        INVALID_ADDRESS_OR_KEY    = -5,
+        INVALID_PARAMETER         = -8,
+        VERIFY_ERROR              = -25,
+
+        TRANSACTION_ERROR         = VERIFY_ERROR,
+
+        CLIENT_P2P_DISABLED       = -31,
+
+        WALLET_ERROR              = -4,
+        WALLET_INSUFFICIENT_FUNDS = -6,
+        WALLET_KEYPOOL_RAN_OUT    = -12,
+        WALLET_UNLOCK_NEEDED      = -13
+    };
+
+    Code code;
+    std::string message;
+
+    CWalletError() : code(Code::SUCCESSFUL) {}
+
+    void Load(Code code, std::string message) {
+        this->code = code;
+        this->message = message;
+    }
+};
+
 /** 
  * A CWallet is an extension of a keystore, which also maintains a set of transactions and balances,
  * and provides the ability to create new transactions.
@@ -1104,6 +1134,30 @@ public:
        caller must ensure the current wallet version is correct before calling
        this function). */
     bool SetHDMasterKey(const CPubKey& key);
+
+    /* Initiates the purchase of tickets
+       It funds and creates the corresponding transactions, as well as it sends them to the memory pool.
+       - fromAccount: The account to use for purchase
+       - spendlimit: Limit on the amount to spend on ticket
+       - minConf: Minimum number of block confirmations required
+       - ticketAddress: Override the ticket address to which voting rights are given
+       - numTickets: The number of tickets to purchase
+       - poolAddress: The address to pay stake pool fees to
+       - poolFee: The amount of fees to pay to the stake pool
+       - expiry: Height at which the purchase tickets expire
+       - ticketFeeIncrement: The transaction fee rate (PAI/kB) to use (overrides fees set by the wallet config or settxfee RPC) (optional)
+       In case of success, the returned vector contains the transactions hex.
+       In case of error, the returned vector is empty. Please check error for a details description */
+     std::vector<std::string> PurchaseTicket(std::string fromAccount,
+                                             CAmount spendLimit,
+                                             int minConf,
+                                             std::string ticketAddress,
+                                             int numTickets,
+                                             std::string poolAddress,
+                                             double poolFee,
+                                             int expiry,
+                                             CAmount ticketFeeIncrement,
+                                             CWalletError &error);
 };
 
 /** A key allocated from the key pool. */

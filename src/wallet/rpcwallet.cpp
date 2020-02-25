@@ -130,6 +130,38 @@ std::string AccountFromValue(const UniValue& value)
     return strAccount;
 }
 
+UniValue JSONRPCErrorFromWalletError(const CWalletError& werror)
+{
+    RPCErrorCode code{RPCErrorCode::INTERNAL_ERROR};
+    switch (werror.code) {
+    case CWalletError::TYPE_ERROR: code = RPCErrorCode::TYPE_ERROR;
+        break;
+    case CWalletError::INVALID_ADDRESS_OR_KEY: code = RPCErrorCode::INVALID_ADDRESS_OR_KEY;
+        break;
+    case CWalletError::INVALID_PARAMETER: code = RPCErrorCode::INVALID_PARAMETER;
+        break;
+    case CWalletError::VERIFY_ERROR: code = RPCErrorCode::VERIFY_ERROR;
+        break;
+    case CWalletError::CLIENT_P2P_DISABLED: code = RPCErrorCode::CLIENT_P2P_DISABLED;
+        break;
+    case CWalletError::WALLET_ERROR: code = RPCErrorCode::WALLET_ERROR;
+        break;
+    case CWalletError::WALLET_INSUFFICIENT_FUNDS: code = RPCErrorCode::WALLET_INSUFFICIENT_FUNDS;
+        break;
+    case CWalletError::WALLET_KEYPOOL_RAN_OUT: code = RPCErrorCode::WALLET_KEYPOOL_RAN_OUT;
+        break;
+    case CWalletError::WALLET_UNLOCK_NEEDED: code = RPCErrorCode::WALLET_UNLOCK_NEEDED;
+        break;
+    default:
+        break;
+    }
+
+    UniValue error{UniValue::VOBJ};
+    error.push_back(Pair("code", ToUnderlying(code)));
+    error.push_back(Pair("message", werror.message));
+    return error;
+}
+
 UniValue getnewaddress(const JSONRPCRequest& request)
 {
     const auto pwallet = GetWalletForJSONRPCRequest(request);
@@ -3116,210 +3148,55 @@ UniValue purchaseticket(const JSONRPCRequest& request)
         };
 
     ObserveSafeMode();
-    LOCK2(cs_main, pwallet->cs_wallet);
 
     // Account
     const auto strAccount = AccountFromValue(request.params[0]);
 
     // Spend limit
     const auto nSpendLimit = AmountFromValue(request.params[1]);
-    if (nSpendLimit <= 0)
-        throw JSONRPCError(RPCErrorCode::TYPE_ERROR, "Invalid spend limit");
 
     // Minimum confirmations
     int nMinDepth{1};
     if (!request.params[2].isNull())
         nMinDepth = request.params[2].get_int();
 
-    if (nMinDepth < 0)
-        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "negative minconf");
-
     // Ticket address
-    CTxDestination ticketAddress;
-    if (!request.params[3].isNull()) {
-        const auto& str = request.params[3].get_str();
-        if (!str.empty()) {
-            ticketAddress = DecodeDestination(str);
-            if (!IsValidDestination(ticketAddress)) {
-                throw JSONRPCError(RPCErrorCode::INVALID_ADDRESS_OR_KEY, "Invalid ticket address");
-            }
-        } else {
-            // Generate a new key that is added to wallet
-            CPubKey newKey;
-            if (!pwallet->GetKeyFromPool(newKey)) {
-                throw JSONRPCError(RPCErrorCode::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-            }
-            ticketAddress = newKey.GetID();
-        }
-    }
+    std::string ticketAddress;
+    if (!request.params[3].isNull())
+        ticketAddress = request.params[3].get_str();
 
     // Number of tickets
     int nNumTickets{1};
-    if (!request.params[4].isNull()) {
+    if (!request.params[4].isNull())
         nNumTickets = request.params[4].get_int();
-        if (nNumTickets < 1)
-            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER,"Number of tickets must be at least 1");
-    }
     
     // Pool address
-    CTxDestination poolAddress;
-    if (!request.params[5].isNull()) {
-        const auto& str = request.params[5].get_str();
-        if (!str.empty()) {
-            poolAddress = DecodeDestination(request.params[5].get_str());
-            if (!IsValidDestination(poolAddress)) {
-                throw JSONRPCError(RPCErrorCode::INVALID_ADDRESS_OR_KEY, "Invalid pool address");
-            }
-        }
-    }
+    std::string poolAddress;
+    if (!request.params[5].isNull())
+        poolAddress = request.params[5].get_str();
 
     double dfPoolFee{0.0};
-    if(!request.params[6].isNull()) {
+    if (!request.params[6].isNull())
         dfPoolFee = request.params[6].get_real();
-        // TODO make it CFeeRate and validate it
-    }
 
     // Expiry
     int nExpiry{0};
     if (!request.params[7].isNull())
         nExpiry = request.params[7].get_int();
 
-    if (nExpiry < 0)
-        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "negative expiry");
-
     // Ticket Fee
     CAmount ticketFeeIncrement;
-    if (!request.params[9].isNull()) {
+    if (!request.params[9].isNull())
         ticketFeeIncrement = AmountFromValue(request.params[9]);
-    }
-    if (ticketFeeIncrement == 0) {
-        // TODO read the wallet's default increment
-    }
 
-
-    // Perform a sanity check on expiry.
-    if (nExpiry > 0  && nExpiry <= chainActive.Height() + 1)
-        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "expiry height must be above next block height");
-
-    // TODO Calculate the current ticket price.
-    //ticketPrice, err := w.NextStakeDifficulty()
-    const auto& ticketPrice = CAmount{34500};
-
-    // Ensure the ticket price does not exceed the spend limit if set.
-    if (ticketPrice > nSpendLimit)
-        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "ticket price above spend limit");
-
-    // Check sanity of poolfee
-    if (IsValidDestination(poolAddress) && dfPoolFee == 0.0)
-        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "stakepool fee percent unset");
-
-    // check ticketAddr type, only P2PKH and P2SH are accepted
-    // seems to always be the case while the address is valid
-
-    // TODO calculate ticket fee based on estimated size and the ticketFee parameter
-    const auto& ticketFee = CAmount{1000};
-    const auto& neededPerTicket = ticketPrice + ticketFee;
-    assert(neededPerTicket > 0);
+    CWalletError werror;
+    const auto&& txids = pwallet->PurchaseTicket(strAccount, nSpendLimit, nMinDepth, ticketAddress, nNumTickets, poolAddress, dfPoolFee, nExpiry, ticketFeeIncrement, werror);
+    if (txids.size() == 0 && werror.code != CWalletError::SUCCESSFUL)
+        throw JSONRPCErrorFromWalletError(werror);
 
     UniValue results{UniValue::VARR};
-
-    EnsureWalletIsUnlocked(pwallet);
-    const auto& splitTxAddr = GetAccountAddress(pwallet,"",true);
-
-    for (int i = 0; i < nNumTickets; ++i) {
-        const auto curBalance = pwallet->GetBalance();
-        if (neededPerTicket > curBalance)
-            throw JSONRPCError(RPCErrorCode::WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
-
-        if (pwallet->GetBroadcastTransactions() && !g_connman) {
-            throw JSONRPCError(RPCErrorCode::CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
-        }
-
-        if (!IsValidDestination(poolAddress)) {
-            // no pool used
-            CMutableTransaction mFundTx;
-
-            // NOTE: in Decred they are adding another regular transaction that collects all the needed funds
-            // see purchaseTickets in createtx.go, they pay the needed value to an Internal address
-            // For the moment we decided avoid constructing a regular transaction before purchase
-            // as there were problems creating the block with both required transactions in it
-
-            // create an output that pays the ticket
-            mFundTx.vout.push_back(CTxOut(neededPerTicket, CScript()));
-
-            CAmount nFeeRet;
-            int nChangePosInOut = -1;
-            auto strFailReason = std::string{};
-            if (!pwallet->FundTransaction(mFundTx,nFeeRet,nChangePosInOut,strFailReason,false,{},CCoinControl{})) {
-                throw JSONRPCError(RPCErrorCode::WALLET_ERROR, strFailReason);
-            }
-
-            CMutableTransaction mTicketTx;
-            BuyTicketData buyTicketData = { 1 };    // version
-            CScript declScript = GetScriptForBuyTicketDecl(buyTicketData);
-            mTicketTx.vout.push_back(CTxOut(0, declScript));
-
-            // create an output that pays ticket stake
-            CScript ticketScript = GetScriptForDestination(ticketAddress);
-            mTicketTx.vout.push_back(CTxOut(ticketPrice, ticketScript));
-
-            if(mFundTx.vin.size() == 1) {
-                //TODO only working for one input, fix this
-                for (const auto& input : mFundTx.vin)
-                {
-                    mTicketTx.vin.push_back(input);
-
-                    CKeyID rewardAddress;
-                    {
-                        // Generate a new key that is added to wallet
-                        CPubKey newKey;
-                        if (!pwallet->GetKeyFromPool(newKey)) {
-                            throw JSONRPCError(RPCErrorCode::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-                        }
-                        rewardAddress = newKey.GetID();
-                    }
-                    const auto& contributedAmount = neededPerTicket; // in case no pool is used, this is equal to the price
-                    TicketContribData ticketContribData = { 1, rewardAddress, contributedAmount };
-                    CScript contributorInfoScript = GetScriptForTicketContrib(ticketContribData);
-                    mTicketTx.vout.push_back(CTxOut(0, contributorInfoScript));
-
-                    // create an output which pays back change
-                    auto changeKey = CKey();
-                    changeKey.MakeNewKey(false);
-                    auto changeAddr = changeKey.GetPubKey().GetID();
-                    CAmount change = mFundTx.vout[nChangePosInOut].nValue + nFeeRet;
-                    assert(change >= 0);
-                    CScript changeScript = GetScriptForDestination(changeAddr);
-                    mTicketTx.vout.push_back(CTxOut(change, changeScript));
-                }
-                std::string reason;
-                if (!ValidateBuyTicketStructure(mTicketTx,reason))
-                    throw JSONRPCError(RPCErrorCode::TRANSACTION_ERROR, "Error while constructing buy ticket transaction :" + reason);
-                
-                if (!pwallet->SignTransaction(mTicketTx))
-                    throw JSONRPCError(RPCErrorCode::TRANSACTION_ERROR, "Signing transaction failed");
-
-            }
-            else {
-                assert(!"Purchase ticket tx with multiple inputs not yet supported!");
-            }
-
-            CValidationState state;
-            CWalletTx wtx;
-            wtx.fTimeReceivedIsTxTime = true;
-            wtx.BindWallet(pwallet);
-            wtx.SetTx(MakeTransactionRef(std::move(mTicketTx)));
-            CReserveKey reservekey{pwallet};
-            if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
-                throw JSONRPCError(RPCErrorCode::TRANSACTION_ERROR, "CommitTransaction failed");
-            }
-            
-            results.push_back(wtx.GetHash().GetHex());
-        }
-        else {
-            // use pool adress
-            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Using pool address is not supported yet");
-        }
+    for (auto&& txid: txids) {
+        results.push_back(txid);
     }
 
     return results;
