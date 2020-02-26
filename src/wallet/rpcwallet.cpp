@@ -3266,7 +3266,7 @@ UniValue generatevote(const JSONRPCRequest& request)
     CMutableTransaction mVoteTx;
 
     // create a reward generation input
-    mVoteTx.vin.push_back(CTxIn(COutPoint(), CScript() << 55 << OP_0));
+    mVoteTx.vin.push_back(CTxIn(COutPoint(), Params().GetConsensus().stakeBaseSigScript));
     mVoteTx.vin.push_back(CTxIn(COutPoint(tickethash, ticketStakeOutputIndex)));
 
     // create a structured OP_RETURN output containing tx declaration and voting data

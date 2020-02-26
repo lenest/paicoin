@@ -1446,7 +1446,10 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
             error.Load(CWalletError::INVALID_ADDRESS_OR_KEY, "Invalid ticket address");
             return results;
         }
-    } else {
+    }
+
+    if (!IsValidDestination(ticketAddr)) {
+        // Generate a new key that is added to wallet
         CPubKey newKey;
         if (!GetKeyFromPool(newKey)) {
             error.Load(CWalletError::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
