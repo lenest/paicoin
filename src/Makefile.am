@@ -249,6 +249,8 @@ libpaicoin_wallet_a_SOURCES = \
   wallet/init.cpp \
   wallet/rpcdump.cpp \
   wallet/rpcwallet.cpp \
+  wallet/ticket-buyer/ticketbuyerconfig.cpp \
+  wallet/ticket-buyer/ticketbuyer.cpp \
   wallet/wallet.cpp \
   wallet/walletdb.cpp \
   $(PAICOIN_CORE_H)

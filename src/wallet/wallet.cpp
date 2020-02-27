@@ -1421,7 +1421,7 @@ bool CWallet::IsHDEnabled() const
     return !hdChain.masterKeyID.IsNull();
 }
 
-std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmount spendLimit, int minConf, std::string ticketAddress, int numTickets, std::string poolAddress, double poolFee, int expiry, CAmount ticketFeeIncrement, CWalletError &error)
+std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmount spendLimit, int minConf, std::string ticketAddress, int numTickets, std::string poolAddress, double poolFee, int64_t expiry, CAmount ticketFeeIncrement, CWalletError &error)
 {
     std::vector<std::string> results;
 

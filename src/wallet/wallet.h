@@ -18,6 +18,8 @@
 #include "wallet/crypter.h"
 #include "wallet/walletdb.h"
 #include "wallet/rpcwallet.h"
+#include "utilmemory.h"
+#include "wallet/ticket-buyer/ticketbuyer.h"
 
 #include <algorithm>
 #include <atomic>
@@ -748,6 +750,8 @@ private:
 
     std::unique_ptr<CWalletDBWrapper> dbw;
 
+    std::unique_ptr<CTicketBuyer> ticketBuyer;
+
 public:
     /*
      * Main wallet lock.
@@ -787,12 +791,14 @@ public:
     // Create wallet with dummy database handle
     CWallet(): dbw(new CWalletDBWrapper())
     {
+        ticketBuyer = MakeUnique<CTicketBuyer>(this);
         SetNull();
     }
 
     // Create wallet with passed-in database handle
     explicit CWallet(std::unique_ptr<CWalletDBWrapper> dbw_in) : dbw(std::move(dbw_in))
     {
+        ticketBuyer = MakeUnique<CTicketBuyer>(this);
         SetNull();
     }
 
@@ -1155,7 +1161,7 @@ public:
                                              int numTickets,
                                              std::string poolAddress,
                                              double poolFee,
-                                             int expiry,
+                                             int64_t expiry,
                                              CAmount ticketFeeIncrement,
                                              CWalletError &error);
 };
