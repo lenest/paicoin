@@ -8,7 +8,10 @@
 #include "ticketbuyerconfig.h"
 #include "validationinterface.h"
 
+#include <atomic>
 #include <thread>
+#include <condition_variable>
+#include <mutex>
 
 class CWallet;
 
