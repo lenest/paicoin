@@ -3293,7 +3293,7 @@ UniValue stopticketbuyer(const JSONRPCRequest& request)
         throw std::runtime_error{
             "stopticketbuyer\n"
             "\nStop the automatic ticket buyer. Applies after current purchase iteration.\n"
-            "\nExamples:\n"
+            "\nExample:\n"
             + HelpExampleCli("stopticketbuyer", "")
         };
 
@@ -3310,6 +3310,59 @@ UniValue stopticketbuyer(const JSONRPCRequest& request)
     tb->stop();
 
     return NullUniValue;
+}
+
+UniValue ticketbuyerconfig(const JSONRPCRequest& request)
+{
+    const auto pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() > 0)
+        throw std::runtime_error{
+            "ticketbuyerconfig\n"
+            "\nReturns the automatic ticket buyer settings.\n"
+            "\nResult\n"
+            "{\n"
+            "  \"buyTickets\" : true|false,              (boolean) true if the ticket buyer is running \n"
+            "  \"fromaccount\" : \"fromaccount\",        (string)  the account to use for purchase (default=\"default\")\n"
+            "  \"maintain\" : n,                         (numeric) minimum amount to maintain in purchasing account\n"
+            "  \"votingaccount\" : \"votingaccount\",    (string)  account to derive voting addresses from; overridden by votingaddress\n"
+            "  \"votingaddress\" : \"votingaddress\",    (string)  address to assign voting rights; overrides votingaccount\n"
+            "  \"poolfeeaddress\" : \"poolfeeaddress\",  (string)  address to pay stake pool fees to\n"
+            "  \"poolfees\" : x.xxx,                     (numeric) amount of fees to pay to the stake pool\n"
+            "  \"limit\" : n,                            (numeric) maximum number of purchased tickets per block\n"
+            "  \"minConf\" : n,                          (numeric) minimum number of block confirmations required\n"
+            "  }\n"
+            "\nExample:\n"
+            + HelpExampleCli("ticketbuyerconfig", "")
+        };
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    if (request.fHelp)
+        return true;
+
+    CTicketBuyer *tb = pwallet->GetTicketBuyer();
+    if (tb == nullptr)
+        throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
+
+    CTicketBuyerConfig& cfg = tb->GetConfig();
+
+    UniValue result{UniValue::VOBJ};
+    result.push_back(Pair("buyTickets", cfg.buyTickets));
+    result.push_back(Pair("account", cfg.account));
+    result.push_back(Pair("maintain", cfg.maintain));
+    result.push_back(Pair("votingAccount", cfg.votingAccount));
+    result.push_back(Pair("votingAddress", cfg.votingAddress));
+    result.push_back(Pair("poolFeeAddress", cfg.poolFeeAddress));
+    result.push_back(Pair("poolFees", cfg.poolFees));
+    result.push_back(Pair("limit", cfg.limit));
+    result.push_back(Pair("minConf", cfg.minConf));
+
+    return result;
 }
 
 UniValue generatevote(const JSONRPCRequest& request)
@@ -4475,6 +4528,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "purchaseticket",           &purchaseticket,           {"spendlimit","fromaccount","minconf","ticketaddress","numtickets","pooladdress","poolfees","expiry","comment","ticketfee"} },
     { "wallet",             "startticketbuyer",         &startticketbuyer,         {"fromaccount","maintain","passphrase","votingaccount","votingaddress","poolfeeaddress","poolfees","limit"} },
     { "wallet",             "stopticketbuyer",          &stopticketbuyer,          {} },
+    { "wallet",             "ticketbuyerconfig",        &ticketbuyerconfig,        {} },
     { "wallet",             "generatevote",             &generatevote,             {"blockhash","height","tickethash","votebits","votebitsext"} },
     { "wallet",             "listwallets",              &listwallets,              {} },
     { "wallet",             "listscripts",              &listscripts,              {} },
