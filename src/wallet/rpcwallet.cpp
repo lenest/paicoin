@@ -3282,6 +3282,36 @@ UniValue startticketbuyer(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
+UniValue stopticketbuyer(const JSONRPCRequest& request)
+{
+    const auto pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() > 0)
+        throw std::runtime_error{
+            "stopticketbuyer\n"
+            "\nStop the automatic ticket buyer. Applies after current purchase iteration.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("stopticketbuyer", "")
+        };
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    if (request.fHelp)
+        return true;
+
+    CTicketBuyer *tb = pwallet->GetTicketBuyer();
+    if (tb == nullptr)
+        throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
+
+    tb->stop();
+
+    return NullUniValue;
+}
+
 UniValue generatevote(const JSONRPCRequest& request)
 {
     const auto pwallet = GetWalletForJSONRPCRequest(request);
@@ -4444,6 +4474,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "listunspent",              &listunspent,              {"minconf","maxconf","addresses","include_unsafe","query_options"} },
     { "wallet",             "purchaseticket",           &purchaseticket,           {"spendlimit","fromaccount","minconf","ticketaddress","numtickets","pooladdress","poolfees","expiry","comment","ticketfee"} },
     { "wallet",             "startticketbuyer",         &startticketbuyer,         {"fromaccount","maintain","passphrase","votingaccount","votingaddress","poolfeeaddress","poolfees","limit"} },
+    { "wallet",             "stopticketbuyer",          &stopticketbuyer,          {} },
     { "wallet",             "generatevote",             &generatevote,             {"blockhash","height","tickethash","votebits","votebitsext"} },
     { "wallet",             "listwallets",              &listwallets,              {} },
     { "wallet",             "listscripts",              &listscripts,              {} },
