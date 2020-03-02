@@ -3365,6 +3365,40 @@ UniValue ticketbuyerconfig(const JSONRPCRequest& request)
     return result;
 }
 
+UniValue setticketbuyeraccount(const JSONRPCRequest& request)
+{
+    const auto pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp  || request.params.size() < 1 || request.params.size() > 1)
+        throw std::runtime_error{
+            "setticketbuyeraccount \"fromaccount\"\n"
+            "\nConfigure the account to use for purchasing tickets.\n"
+            "\nArguments:\n"
+            "1.  \"fromaccount\"     (string, required)    The account to use for purchase (default=\"default\")\n"
+            "\nExample:\n"
+            + HelpExampleCli("setticketbuyeraccount", "\"default\"")
+        };
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    if (request.fHelp)
+        return true;
+
+    CTicketBuyer *tb = pwallet->GetTicketBuyer();
+    if (tb == nullptr)
+        throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
+
+    CTicketBuyerConfig& cfg = tb->GetConfig();
+
+    cfg.account = AccountFromValue(request.params[0]);
+
+    return NullUniValue;
+}
+
 UniValue generatevote(const JSONRPCRequest& request)
 {
     const auto pwallet = GetWalletForJSONRPCRequest(request);
@@ -4529,6 +4563,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "startticketbuyer",         &startticketbuyer,         {"fromaccount","maintain","passphrase","votingaccount","votingaddress","poolfeeaddress","poolfees","limit"} },
     { "wallet",             "stopticketbuyer",          &stopticketbuyer,          {} },
     { "wallet",             "ticketbuyerconfig",        &ticketbuyerconfig,        {} },
+    { "wallet",             "setticketbuyeraccount",    &setticketbuyeraccount,    {"fromaccount"} },
     { "wallet",             "generatevote",             &generatevote,             {"blockhash","height","tickethash","votebits","votebitsext"} },
     { "wallet",             "listwallets",              &listwallets,              {} },
     { "wallet",             "listscripts",              &listscripts,              {} },
