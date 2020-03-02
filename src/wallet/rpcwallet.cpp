@@ -3372,7 +3372,7 @@ UniValue setticketbuyeraccount(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (request.fHelp  || request.params.size() < 1 || request.params.size() > 1)
+    if (request.fHelp  || request.params.size() != 1)
         throw std::runtime_error{
             "setticketbuyeraccount \"fromaccount\"\n"
             "\nConfigure the account to use for purchasing tickets.\n"
@@ -3395,6 +3395,40 @@ UniValue setticketbuyeraccount(const JSONRPCRequest& request)
     CTicketBuyerConfig& cfg = tb->GetConfig();
 
     cfg.account = AccountFromValue(request.params[0]);
+
+    return NullUniValue;
+}
+
+UniValue setticketbuyerbalancetomaintain(const JSONRPCRequest& request)
+{
+    const auto pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp  || request.params.size() != 1)
+        throw std::runtime_error{
+            "setticketbuyerbalancetomaintain \"maintain\"\n"
+            "\nConfigure the minimum amount to maintain in purchasing account when purchasing tickets.\n"
+            "\nArguments:\n"
+            "1.  \"maintain\" : n     (numeric, required)     minimum amount to maintain in purchasing account\n"
+            "\nExample:\n"
+            + HelpExampleCli("setticketbuyerbalancetomaintain", "50")
+        };
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    if (request.fHelp)
+        return true;
+
+    CTicketBuyer *tb = pwallet->GetTicketBuyer();
+    if (tb == nullptr)
+        throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
+
+    CTicketBuyerConfig& cfg = tb->GetConfig();
+
+    cfg.maintain = AmountFromValue(request.params[0]);
 
     return NullUniValue;
 }
@@ -4512,81 +4546,82 @@ extern UniValue rescanblockchain(const JSONRPCRequest& request);
 static const CRPCCommand commands[] =
 { //  category              name                        actor (function)           argNames
     //  --------------------- ------------------------    -----------------------  ----------
-    { "rawtransactions",    "fundrawtransaction",       &fundrawtransaction,       {"hexstring","options"} },
-    { "hidden",             "resendwallettransactions", &resendwallettransactions, {} },
-    { "wallet",             "abandontransaction",       &abandontransaction,       {"txid"} },
-    { "wallet",             "abortrescan",              &abortrescan,              {} },
-    { "wallet",             "addmultisigaddress",       &addmultisigaddress,       {"nrequired","keys","account"} },
-    { "wallet",             "addwitnessaddress",        &addwitnessaddress,        {"address"} },
-    { "wallet",             "backupwallet",             &backupwallet,             {"destination"} },
-    { "wallet",             "bumpfee",                  &bumpfee,                  {"txid", "options"} },
-    { "wallet",             "dumpprivkey",              &dumpprivkey,              {"address"}  },
-    { "wallet",             "dumpwallet",               &dumpwallet,               {"filename"} },
-    { "wallet",             "encryptwallet",            &encryptwallet,            {"passphrase"} },
-    { "wallet",             "getaccountaddress",        &getaccountaddress,        {"account"} },
-    { "wallet",             "getaccount",               &getaccount,               {"address"} },
-    { "wallet",             "getaddressesbyaccount",    &getaddressesbyaccount,    {"account"} },
-    { "wallet",             "getbalance",               &getbalance,               {"account","minconf","include_watchonly"} },
-    { "wallet",             "getnewaddress",            &getnewaddress,            {"account"} },
-    { "wallet",             "createnewaccount",         &createnewaccount,         {"account"} },
-    { "wallet",             "renameaccount",            &renameaccount,            {"oldAccount", "newAccount"} },
-    { "wallet",             "getrawchangeaddress",      &getrawchangeaddress,      {} },
-    { "wallet",             "getreceivedbyaccount",     &getreceivedbyaccount,     {"account","minconf"} },
-    { "wallet",             "getreceivedbyaddress",     &getreceivedbyaddress,     {"address","minconf"} },
-    { "wallet",             "getticketfee",             &getticketfee,             {} },
-    { "wallet",             "gettickets",               &gettickets,               {"includeimmature"} },
-    { "wallet",             "revoketickets",            &revoketickets,            {} },
-    { "wallet",             "setticketfee",             &setticketfee,             {"fee"} },
-    { "wallet",             "listtickets",              &listtickets,              {} },
-    { "wallet",             "gettransaction",           &gettransaction,           {"txid","include_watchonly"} },
-    { "wallet",             "getunconfirmedbalance",    &getunconfirmedbalance,    {} },
-    { "wallet",             "getwalletinfo",            &getwalletinfo,            {} },
-    { "wallet",             "getstakeinfo",             &getstakeinfo,             {} },
-    { "wallet",             "stakepooluserinfo",        &stakepooluserinfo,        {"user"} },
-    { "wallet",             "importmulti",              &importmulti,              {"requests","options"} },
-    { "wallet",             "importprivkey",            &importprivkey,            {"privkey","label","rescan"} },
-    { "wallet",             "importwallet",             &importwallet,             {"filename"} },
-    { "wallet",             "importaddress",            &importaddress,            {"address","label","rescan","p2sh"} },
-    { "wallet",             "importscript",             &importscript,             {"script","rescan","scanfrom"} },
-    { "wallet",             "importprunedfunds",        &importprunedfunds,        {"rawtransaction","txoutproof"} },
-    { "wallet",             "importpubkey",             &importpubkey,             {"pubkey","label","rescan"} },
-    { "wallet",             "keypoolrefill",            &keypoolrefill,            {"newsize"} },
-    { "wallet",             "listaccounts",             &listaccounts,             {"minconf","include_watchonly"} },
-    { "wallet",             "listaddressgroupings",     &listaddressgroupings,     {} },
-    { "wallet",             "listlockunspent",          &listlockunspent,          {} },
-    { "wallet",             "listreceivedbyaccount",    &listreceivedbyaccount,    {"minconf","include_empty","include_watchonly"} },
-    { "wallet",             "listreceivedbyaddress",    &listreceivedbyaddress,    {"minconf","include_empty","include_watchonly"} },
-    { "wallet",             "listsinceblock",           &listsinceblock,           {"blockhash","target_confirmations","include_watchonly","include_removed"} },
-    { "wallet",             "listtransactions",         &listtransactions,         {"account","count","skip","include_watchonly"} },
-    { "wallet",             "listunspent",              &listunspent,              {"minconf","maxconf","addresses","include_unsafe","query_options"} },
-    { "wallet",             "purchaseticket",           &purchaseticket,           {"spendlimit","fromaccount","minconf","ticketaddress","numtickets","pooladdress","poolfees","expiry","comment","ticketfee"} },
-    { "wallet",             "startticketbuyer",         &startticketbuyer,         {"fromaccount","maintain","passphrase","votingaccount","votingaddress","poolfeeaddress","poolfees","limit"} },
-    { "wallet",             "stopticketbuyer",          &stopticketbuyer,          {} },
-    { "wallet",             "ticketbuyerconfig",        &ticketbuyerconfig,        {} },
-    { "wallet",             "setticketbuyeraccount",    &setticketbuyeraccount,    {"fromaccount"} },
-    { "wallet",             "generatevote",             &generatevote,             {"blockhash","height","tickethash","votebits","votebitsext"} },
-    { "wallet",             "listwallets",              &listwallets,              {} },
-    { "wallet",             "listscripts",              &listscripts,              {} },
-    { "wallet",             "lockunspent",              &lockunspent,              {"unlock","transactions"} },
-    { "wallet",             "move",                     &movecmd,                  {"fromaccount","toaccount","amount","minconf","comment"} },
-    { "wallet",             "sendfrom",                 &sendfrom,                 {"fromaccount","toaddress","amount","minconf","comment","comment_to"} },
-    { "wallet",             "sendmany",                 &sendmany,                 {"fromaccount","amounts","minconf","comment","subtractfeefrom","replaceable","conf_target","estimate_mode"} },
-    { "wallet",             "sendtoaddress",            &sendtoaddress,            {"address","amount","comment","comment_to","subtractfeefromamount","replaceable","conf_target","estimate_mode"} },
-    { "wallet",             "setaccount",               &setaccount,               {"address","account"} },
-    { "wallet",             "settxfee",                 &settxfee,                 {"amount"} },
-    { "wallet",             "signmessage",              &signmessage,              {"address","message"} },
-    { "wallet",             "walletlock",               &walletlock,               {} },
-    { "wallet",             "walletpassphrasechange",   &walletpassphrasechange,   {"oldpassphrase","newpassphrase"} },
-    { "wallet",             "walletpassphrase",         &walletpassphrase,         {"passphrase","timeout"} },
-    { "wallet",             "removeprunedfunds",        &removeprunedfunds,        {"txid"} },
-    { "wallet",             "rescanblockchain",         &rescanblockchain,         {"start_height", "stop_height"} },
-    { "wallet",             "getmultisigoutinfo",       &getmultisigoutinfo,       {"hash", "index"} },
-    { "wallet",             "redeemmultisigout",        &redeemmultisigout,        {"hash", "index", "tree", "address"} },
-    { "wallet",             "redeemmultisigouts",       &redeemmultisigouts,       {"fromscraddress", "toaddress", "number"} },
-    { "wallet",             "sendtomultisig",           &sendtomultisig,           {"fromaccount", "amount", "pubkeys", "nrequired", "minconf", "comment"} },
-    { "wallet",             "getmasterpubkey",          &getmasterpubkey,          {"account"} },
+    { "rawtransactions",    "fundrawtransaction",               &fundrawtransaction,                {"hexstring","options"} },
+    { "hidden",             "resendwallettransactions",         &resendwallettransactions,          {} },
+    { "wallet",             "abandontransaction",               &abandontransaction,                {"txid"} },
+    { "wallet",             "abortrescan",                      &abortrescan,                       {} },
+    { "wallet",             "addmultisigaddress",               &addmultisigaddress,                {"nrequired","keys","account"} },
+    { "wallet",             "addwitnessaddress",                &addwitnessaddress,                 {"address"} },
+    { "wallet",             "backupwallet",                     &backupwallet,                      {"destination"} },
+    { "wallet",             "bumpfee",                          &bumpfee,                           {"txid", "options"} },
+    { "wallet",             "dumpprivkey",                      &dumpprivkey,                       {"address"}  },
+    { "wallet",             "dumpwallet",                       &dumpwallet,                        {"filename"} },
+    { "wallet",             "encryptwallet",                    &encryptwallet,                     {"passphrase"} },
+    { "wallet",             "getaccountaddress",                &getaccountaddress,                 {"account"} },
+    { "wallet",             "getaccount",                       &getaccount,                        {"address"} },
+    { "wallet",             "getaddressesbyaccount",            &getaddressesbyaccount,             {"account"} },
+    { "wallet",             "getbalance",                       &getbalance,                        {"account","minconf","include_watchonly"} },
+    { "wallet",             "getnewaddress",                    &getnewaddress,                     {"account"} },
+    { "wallet",             "createnewaccount",                 &createnewaccount,                  {"account"} },
+    { "wallet",             "renameaccount",                    &renameaccount,                     {"oldAccount", "newAccount"} },
+    { "wallet",             "getrawchangeaddress",              &getrawchangeaddress,               {} },
+    { "wallet",             "getreceivedbyaccount",             &getreceivedbyaccount,              {"account","minconf"} },
+    { "wallet",             "getreceivedbyaddress",             &getreceivedbyaddress,              {"address","minconf"} },
+    { "wallet",             "getticketfee",                     &getticketfee,                      {} },
+    { "wallet",             "gettickets",                       &gettickets,                        {"includeimmature"} },
+    { "wallet",             "revoketickets",                    &revoketickets,                     {} },
+    { "wallet",             "setticketfee",                     &setticketfee,                      {"fee"} },
+    { "wallet",             "listtickets",                      &listtickets,                       {} },
+    { "wallet",             "gettransaction",                   &gettransaction,                    {"txid","include_watchonly"} },
+    { "wallet",             "getunconfirmedbalance",            &getunconfirmedbalance,             {} },
+    { "wallet",             "getwalletinfo",                    &getwalletinfo,                     {} },
+    { "wallet",             "getstakeinfo",                     &getstakeinfo,                      {} },
+    { "wallet",             "stakepooluserinfo",                &stakepooluserinfo,                 {"user"} },
+    { "wallet",             "importmulti",                      &importmulti,                       {"requests","options"} },
+    { "wallet",             "importprivkey",                    &importprivkey,                     {"privkey","label","rescan"} },
+    { "wallet",             "importwallet",                     &importwallet,                      {"filename"} },
+    { "wallet",             "importaddress",                    &importaddress,                     {"address","label","rescan","p2sh"} },
+    { "wallet",             "importscript",                     &importscript,                      {"script","rescan","scanfrom"} },
+    { "wallet",             "importprunedfunds",                &importprunedfunds,                 {"rawtransaction","txoutproof"} },
+    { "wallet",             "importpubkey",                     &importpubkey,                      {"pubkey","label","rescan"} },
+    { "wallet",             "keypoolrefill",                    &keypoolrefill,                     {"newsize"} },
+    { "wallet",             "listaccounts",                     &listaccounts,                      {"minconf","include_watchonly"} },
+    { "wallet",             "listaddressgroupings",             &listaddressgroupings,              {} },
+    { "wallet",             "listlockunspent",                  &listlockunspent,                   {} },
+    { "wallet",             "listreceivedbyaccount",            &listreceivedbyaccount,             {"minconf","include_empty","include_watchonly"} },
+    { "wallet",             "listreceivedbyaddress",            &listreceivedbyaddress,             {"minconf","include_empty","include_watchonly"} },
+    { "wallet",             "listsinceblock",                   &listsinceblock,                    {"blockhash","target_confirmations","include_watchonly","include_removed"} },
+    { "wallet",             "listtransactions",                 &listtransactions,                  {"account","count","skip","include_watchonly"} },
+    { "wallet",             "listunspent",                      &listunspent,                       {"minconf","maxconf","addresses","include_unsafe","query_options"} },
+    { "wallet",             "purchaseticket",                   &purchaseticket,                    {"spendlimit","fromaccount","minconf","ticketaddress","numtickets","pooladdress","poolfees","expiry","comment","ticketfee"} },
+    { "wallet",             "startticketbuyer",                 &startticketbuyer,                  {"fromaccount","maintain","passphrase","votingaccount","votingaddress","poolfeeaddress","poolfees","limit"} },
+    { "wallet",             "stopticketbuyer",                  &stopticketbuyer,                   {} },
+    { "wallet",             "ticketbuyerconfig",                &ticketbuyerconfig,                 {} },
+    { "wallet",             "setticketbuyeraccount",            &setticketbuyeraccount,             {"fromaccount"} },
+    { "wallet",             "setticketbuyerbalancetomaintain",  &setticketbuyerbalancetomaintain,   {"maintain"} },
+    { "wallet",             "generatevote",                     &generatevote,                      {"blockhash","height","tickethash","votebits","votebitsext"} },
+    { "wallet",             "listwallets",                      &listwallets,                       {} },
+    { "wallet",             "listscripts",                      &listscripts,                       {} },
+    { "wallet",             "lockunspent",                      &lockunspent,                       {"unlock","transactions"} },
+    { "wallet",             "move",                             &movecmd,                           {"fromaccount","toaccount","amount","minconf","comment"} },
+    { "wallet",             "sendfrom",                         &sendfrom,                          {"fromaccount","toaddress","amount","minconf","comment","comment_to"} },
+    { "wallet",             "sendmany",                         &sendmany,                          {"fromaccount","amounts","minconf","comment","subtractfeefrom","replaceable","conf_target","estimate_mode"} },
+    { "wallet",             "sendtoaddress",                    &sendtoaddress,                     {"address","amount","comment","comment_to","subtractfeefromamount","replaceable","conf_target","estimate_mode"} },
+    { "wallet",             "setaccount",                       &setaccount,                        {"address","account"} },
+    { "wallet",             "settxfee",                         &settxfee,                          {"amount"} },
+    { "wallet",             "signmessage",                      &signmessage,                       {"address","message"} },
+    { "wallet",             "walletlock",                       &walletlock,                        {} },
+    { "wallet",             "walletpassphrasechange",           &walletpassphrasechange,            {"oldpassphrase","newpassphrase"} },
+    { "wallet",             "walletpassphrase",                 &walletpassphrase,                  {"passphrase","timeout"} },
+    { "wallet",             "removeprunedfunds",                &removeprunedfunds,                 {"txid"} },
+    { "wallet",             "rescanblockchain",                 &rescanblockchain,                  {"start_height", "stop_height"} },
+    { "wallet",             "getmultisigoutinfo",               &getmultisigoutinfo,                {"hash", "index"} },
+    { "wallet",             "redeemmultisigout",                &redeemmultisigout,                 {"hash", "index", "tree", "address"} },
+    { "wallet",             "redeemmultisigouts",               &redeemmultisigouts,                {"fromscraddress", "toaddress", "number"} },
+    { "wallet",             "sendtomultisig",                   &sendtomultisig,                    {"fromaccount", "amount", "pubkeys", "nrequired", "minconf", "comment"} },
+    { "wallet",             "getmasterpubkey",                  &getmasterpubkey,                   {"account"} },
 
-    { "generating",         "generate",                 &generate,                 {"nblocks","maxtries"} },
+    { "generating",         "generate",                         &generate,                          {"nblocks","maxtries"} },
 };
 
 void RegisterWalletRPCCommands(CRPCTable &t)
