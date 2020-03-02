@@ -25,6 +25,11 @@ public:
     virtual void UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockIndex *pindexFork, bool fInitialDownload);
     //virtual void BlockConnected(const std::shared_ptr<const CBlock> &block, const CBlockIndex *pindex, const std::vector<CTransactionRef> &txnConflicted);
 
+    CTicketBuyerConfig& GetConfig() { return config; }
+
+    void start();
+    void stop();    // does not stop immediately, but only after the current iteration
+
 private:
     void mainLoop();
 

@@ -1164,6 +1164,9 @@ public:
                                              int64_t expiry,
                                              CAmount ticketFeeIncrement,
                                              CWalletError &error);
+
+     /* Returns the ticket buyer */
+     CTicketBuyer* GetTicketBuyer() { return ticketBuyer.get(); }
 };
 
 /** A key allocated from the key pool. */

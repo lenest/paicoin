@@ -45,6 +45,16 @@ void CTicketBuyer::UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockInd
 //{
 //}
 
+void CTicketBuyer::start()
+{
+    config.buyTickets = true;
+}
+
+void CTicketBuyer::stop()
+{
+    config.buyTickets = false;
+}
+
 void CTicketBuyer::mainLoop()
 {
     CBlockIndex* chainTip = nullptr;

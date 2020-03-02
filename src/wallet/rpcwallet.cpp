@@ -3202,6 +3202,86 @@ UniValue purchaseticket(const JSONRPCRequest& request)
     return results;
 }
 
+UniValue startticketbuyer(const JSONRPCRequest& request)
+{
+    const auto pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
+        throw std::runtime_error{
+            "startticketbuyer \"fromaccount\" maintain (\"passphrase\" \"votingaccount\" \"votingaddress\" \"poolfeeaddress\" poolfees limit)\n"
+            "\nStart the automatic ticket buyer with the specified settings.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "1.  \"fromaccount\"     (string, required)    The account to use for purchase (default=\"default\")\n"
+            "2.  maintain           (numeric, required)   Minimum amount to maintain in purchasing account\n"
+            "3.  \"passphrase\"     (string, optional)    The passphrase to use for unlocking the wallet\n"
+            "4.  \"votingaccount\"  (string, optional)    Account to derive voting addresses from; overridden by votingaddress\n"
+            "5.  \"votingaddress\"  (string, optional)    Address to assign voting rights; overrides votingaccount\n"
+            "6.  \"poolfeeaddress\" (string, optional)    The address to pay stake pool fees to\n"
+            "7.  poolfees           (numeric, optional)   The amount of fees to pay to the stake pool\n"
+            "8.  limit              (numeric, optional)   Limit maximum number of purchased tickets per block\n"
+            "\nExamples:\n"
+            "\nStart the ticket buyer from your default account to purchase tickets and leaving at least 50 PAI\n"
+            + HelpExampleCli("startticketbuyer", "\"default\" 50") +
+            "\nStart the ticket buyer from your default account to purchase at most 5 tickets in a block\n"
+            + HelpExampleCli("startticketbuyer", "\"default\" 50 \"\" \"\" \"\" \"\" 0 5") +
+            "\nStart the ticket buyer from your default account to purchase tickets for a specified voting address\n"
+            + HelpExampleCli("startticketbuyer", "\"default\" 50 \"\" \"\" \"my_voting_address\" \"\" 0 5")
+        };
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    if (request.fHelp)
+        return true;
+
+    CTicketBuyer *tb = pwallet->GetTicketBuyer();
+    if (tb == nullptr)
+        throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
+
+    CTicketBuyerConfig& cfg = tb->GetConfig();
+
+    // From account
+    cfg.account = AccountFromValue(request.params[0]);
+
+    // Maintain
+    cfg.maintain = AmountFromValue(request.params[1]);
+
+    // Passphrase
+    if (!request.params[2].isNull()) {
+        cfg.passphrase.clear();
+        cfg.passphrase.reserve(100);
+        cfg.passphrase = request.params[2].get_str().c_str();
+    }
+
+    // Voting account
+    if (!request.params[3].isNull())
+        cfg.votingAccount = AccountFromValue(request.params[3]);
+
+    // Voting address
+    if (!request.params[4].isNull())
+        cfg.votingAddress = request.params[4].get_str();
+
+    // Pool fee address
+    if (!request.params[5].isNull())
+        cfg.poolFeeAddress = request.params[5].get_str();
+
+    // Pool fees
+    if (!request.params[6].isNull())
+        cfg.poolFees = request.params[6].get_real();
+
+    // Pool fees
+    if (!request.params[7].isNull())
+        cfg.limit = request.params[7].get_int();
+
+    tb->start();
+
+    return NullUniValue;
+}
+
 UniValue generatevote(const JSONRPCRequest& request)
 {
     const auto pwallet = GetWalletForJSONRPCRequest(request);
@@ -4363,6 +4443,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "listtransactions",         &listtransactions,         {"account","count","skip","include_watchonly"} },
     { "wallet",             "listunspent",              &listunspent,              {"minconf","maxconf","addresses","include_unsafe","query_options"} },
     { "wallet",             "purchaseticket",           &purchaseticket,           {"spendlimit","fromaccount","minconf","ticketaddress","numtickets","pooladdress","poolfees","expiry","comment","ticketfee"} },
+    { "wallet",             "startticketbuyer",         &startticketbuyer,         {"fromaccount","maintain","passphrase","votingaccount","votingaddress","poolfeeaddress","poolfees","limit"} },
     { "wallet",             "generatevote",             &generatevote,             {"blockhash","height","tickethash","votebits","votebitsext"} },
     { "wallet",             "listwallets",              &listwallets,              {} },
     { "wallet",             "listscripts",              &listscripts,              {} },
