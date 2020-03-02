@@ -6,37 +6,25 @@
 #include "util.h"
 
 CTicketBuyerConfig::CTicketBuyerConfig() :
-    BuyTickets(false),
-    Maintain(0),
-    PoolFees(0.0),
-    Limit(1)
+    buyTickets(false),
+    maintain(0),
+    poolFees(0.0),
+    limit(1)
 {
     ParseCommandline();
-}
-
-CTicketBuyerConfig::CTicketBuyerConfig(CTicketBuyerConfig&& o)
-{
-    BuyTickets = o.BuyTickets;
-    Account = o.Account;
-    VotingAccount = o.VotingAccount;
-    Maintain = o.Maintain;
-    VotingAddress = o.VotingAddress;
-    PoolFeeAddress = o.PoolFeeAddress;
-    PoolFees = o.PoolFees;
-    Limit = o.Limit;
 }
 
 void CTicketBuyerConfig::ParseCommandline()
 {
     if (gArgs.IsArgSet("-tbbalancetomaintainabsolute"))
-        Maintain = gArgs.GetArg("-tbbalancetomaintainabsolute", 0);
+        maintain = gArgs.GetArg("-tbbalancetomaintainabsolute", 0);
 
     if (gArgs.IsArgSet("-tbvotingaddress"))
-        VotingAddress = gArgs.GetArg("-tbvotingaddress", "");
+        votingAddress = gArgs.GetArg("-tbvotingaddress", "");
 
     if (gArgs.IsArgSet("-tblimit"))
-        Limit = static_cast<int>(gArgs.GetArg("-tblimit", 0));
+        limit = static_cast<int>(gArgs.GetArg("-tblimit", 0));
 
     if (gArgs.IsArgSet("-tbvotingaccount"))
-        VotingAccount = gArgs.GetArg("-tbvotingaccount", "");
+        votingAccount = gArgs.GetArg("-tbvotingaccount", "");
 }

@@ -13,37 +13,36 @@ class CTicketBuyerConfig {
 
 public:
     // Enables the automatic ticket purchasing
-    bool BuyTickets;
+    bool buyTickets;
 
     // Account to buy tickets from
-    std::string Account;
-
-    // Account to derive voting addresses from; overridden by VotingAddr
-    std::string VotingAccount;
+    std::string account;
 
     // Minimum amount to maintain in purchasing account
-    CAmount Maintain;
+    CAmount maintain;
+
+    // Account to derive voting addresses from; overridden by VotingAddr
+    std::string votingAccount;
 
     // Address to assign voting rights; overrides VotingAccount
-    std::string VotingAddress;
+    std::string votingAddress;
 
     // Commitment address for stakepool fees
-    std::string PoolFeeAddress;
+    std::string poolFeeAddress;
 
     // Stakepool fee percentage (between 0-100)
-    double PoolFees;
+    double poolFees;
 
     // Limit maximum number of purchased tickets per block
-    int Limit;
+    int limit;
 
     // Minimum number of block confirmations required
-    const int MinConf = 1;
+    const int minConf = 1;
 
     // Wallet passphrase
-    SecureString Passphrase;
+    SecureString passphrase;
 
     CTicketBuyerConfig();
-    CTicketBuyerConfig(CTicketBuyerConfig&& o);
 
     void ParseCommandline();
 };

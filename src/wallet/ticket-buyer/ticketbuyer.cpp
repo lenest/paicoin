@@ -58,7 +58,7 @@ void CTicketBuyer::mainLoop()
 
     while (shouldRun.load()) {
         // wait until activated
-        if (! config.BuyTickets) {
+        if (! config.buyTickets) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
@@ -74,7 +74,7 @@ void CTicketBuyer::mainLoop()
         // unlock wallet
         // TODO add password to the config
         // TODO add proper error handling
-        if (pwallet->IsLocked() && ! pwallet->Unlock(config.Passphrase)) {
+        if (pwallet->IsLocked() && ! pwallet->Unlock(config.passphrase)) {
             break;
         }
 
@@ -119,11 +119,11 @@ void CTicketBuyer::mainLoop()
 
         // Determine how many tickets to buy
         spendable = pwallet->GetAvailableBalance();
-        if (spendable < config.Maintain) {
+        if (spendable < config.maintain) {
             LogPrintf("CTicketBuyer: Skipping purchase: low available balance");
             continue;
         }
-        spendable -= config.Maintain;
+        spendable -= config.maintain;
 
         sdiff = calcNextRequiredStakeDifficulty(chainTip->GetBlockHeader(), chainTip, Params());
 
@@ -137,11 +137,11 @@ void CTicketBuyer::mainLoop()
         if (buy > max)
             buy = max;
 
-        if (config.Limit > 0 && buy > config.Limit)
-            buy = config.Limit;
+        if (config.limit > 0 && buy > config.limit)
+            buy = config.limit;
 
         CWalletError error;
-        std::vector<std::string> tickets = pwallet->PurchaseTicket(config.Account, spendable, config.MinConf, config.VotingAddress, buy, config.PoolFeeAddress, config.PoolFees, expiry, 0 /*TODO Make sure this is handled correctly*/, error);
+        std::vector<std::string> tickets = pwallet->PurchaseTicket(config.account, spendable, config.minConf, config.votingAddress, buy, config.poolFeeAddress, config.poolFees, expiry, 0 /*TODO Make sure this is handled correctly*/, error);
         if (tickets.size() > 0 && error.code == CWalletError::SUCCESSFUL) {
             LogPrintf("CTicketBuyer: Purchased tickets: %s", std::accumulate(tickets.begin(), tickets.end(), std::string()));
         } else {
