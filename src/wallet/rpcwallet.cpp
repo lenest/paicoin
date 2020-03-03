@@ -3237,52 +3237,87 @@ UniValue startticketbuyer(const JSONRPCRequest& request)
     if (request.fHelp)
         return true;
 
+    // From account
+    const auto&& account = AccountFromValue(request.params[0]);
+
+    // Maintain
+    const auto&& maintain = AmountFromValue(request.params[1]);
+
+    // Passphrase
+    SecureString passphrase;
+    if (!request.params[2].isNull()) {
+        if (!request.params[2].isStr())
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid passphrase.");
+
+        passphrase.clear();
+        passphrase.reserve(100);
+        passphrase = request.params[2].get_str().c_str();
+    }
+
+    // Voting account
+    std::string votingAccount;
+    if (!request.params[3].isNull())
+        votingAccount = AccountFromValue(request.params[3]);
+
+    // Voting address
+    std::string votingAddress;
+    if (!request.params[4].isNull()) {
+        if (!request.params[4].isStr())
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid voting address.");
+
+        votingAddress = request.params[4].get_str();
+
+        if (votingAddress.length() > 0 && !IsValidDestination(DecodeDestination(votingAddress)))
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid voting address.");
+    }
+
+    // Pool fee address
+    std::string poolFeeAddress;
+    if (!request.params[5].isNull()) {
+        if (!request.params[5].isStr())
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid pool fee address.");
+
+        poolFeeAddress = request.params[5].get_str();
+
+        if (poolFeeAddress.length() > 0 && !IsValidDestination(DecodeDestination(poolFeeAddress)))
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid pool fee address.");
+    }
+
+    // Pool fees
+    double poolFees{0.0};
+    if (!request.params[6].isNull()) {
+        if (!request.params[6].isNum())
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid pool fee.");
+
+        poolFees = request.params[6].get_real();
+        if (poolFees < 0.0)
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "The pool fee cannot be negative.");
+    }
+
+    // Limit
+    int limit{1};
+    if (!request.params[7].isNull()) {
+        if (!request.params[7].isNum())
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid limit.");
+
+        limit = request.params[7].get_int();
+        if (limit < 1)
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "The number of tickets must be at least 1.");
+    }
+
     CTicketBuyer *tb = pwallet->GetTicketBuyer();
     if (tb == nullptr)
         throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
 
     CTicketBuyerConfig& cfg = tb->GetConfig();
-
-    // From account
-    cfg.account = AccountFromValue(request.params[0]);
-
-    // Maintain
-    cfg.maintain = AmountFromValue(request.params[1]);
-
-    // Passphrase
-    if (!request.params[2].isNull()) {
-        cfg.passphrase.clear();
-        cfg.passphrase.reserve(100);
-        cfg.passphrase = request.params[2].get_str().c_str();
-    }
-
-    // Voting account
-    if (!request.params[3].isNull())
-        cfg.votingAccount = AccountFromValue(request.params[3]);
-
-    // Voting address
-    if (!request.params[4].isNull())
-        cfg.votingAddress = request.params[4].get_str();
-
-    // Pool fee address
-    if (!request.params[5].isNull())
-        cfg.poolFeeAddress = request.params[5].get_str();
-
-    // Pool fees
-    if (!request.params[6].isNull()) {
-        double value = request.params[6].get_real();
-        if (value < 0.0)
-            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "The pool fee cannot be negative.");
-        cfg.poolFees = value;
-    }
-
-    // Limit
-    if (!request.params[7].isNull()) {
-        int value = request.params[7].get_int();
-        if (value < 0)
-            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "The limit cannot be negative.");
-        cfg.limit = value;
-    }
+    cfg.account = account;
+    cfg.maintain = maintain;
+    cfg.passphrase = passphrase;
+    cfg.votingAccount = votingAccount;
+    cfg.votingAddress = votingAddress;
+    cfg.poolFeeAddress = poolFeeAddress;
+    cfg.poolFees = poolFees;
+    cfg.limit = limit;
 
     tb->start();
 
