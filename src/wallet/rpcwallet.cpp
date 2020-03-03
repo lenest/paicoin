@@ -3498,13 +3498,22 @@ UniValue setticketbuyervotingaddress(const JSONRPCRequest& request)
     if (request.fHelp)
         return true;
 
+    std::string votingAddress;
+    if (!request.params[0].isStr())
+        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid voting address.");
+
+    votingAddress = request.params[0].get_str();
+
+    if (votingAddress.length() > 0 && !IsValidDestination(DecodeDestination(votingAddress)))
+        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid voting address.");
+
     CTicketBuyer *tb = pwallet->GetTicketBuyer();
     if (tb == nullptr)
         throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
 
     CTicketBuyerConfig& cfg = tb->GetConfig();
 
-    cfg.votingAddress = request.params[0].get_str();
+    cfg.votingAddress = votingAddress;
 
     return NullUniValue;
 }
@@ -3532,13 +3541,22 @@ UniValue setticketbuyerpooladdress(const JSONRPCRequest& request)
     if (request.fHelp)
         return true;
 
+    std::string poolAddress;
+    if (!request.params[0].isStr())
+        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid pool address.");
+
+    poolAddress = request.params[0].get_str();
+
+    if (poolAddress.length() > 0 && !IsValidDestination(DecodeDestination(poolAddress)))
+        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "Invalid pool address.");
+
     CTicketBuyer *tb = pwallet->GetTicketBuyer();
     if (tb == nullptr)
         throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
 
     CTicketBuyerConfig& cfg = tb->GetConfig();
 
-    cfg.poolFeeAddress = request.params[0].get_str();
+    cfg.poolFeeAddress = poolAddress;
 
     return NullUniValue;
 }
