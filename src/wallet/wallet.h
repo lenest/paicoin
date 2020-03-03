@@ -1153,17 +1153,17 @@ public:
        - expiry: Height at which the purchase tickets expire
        - ticketFeeIncrement: The transaction fee rate (PAI/kB) to use (overrides fees set by the wallet config or settxfee RPC) (optional)
        In case of success, the returned vector contains the transactions hex.
-       In case of error, the returned vector is empty. Please check error for a details description */
-     std::vector<std::string> PurchaseTicket(std::string fromAccount,
-                                             CAmount spendLimit,
-                                             int minConf,
-                                             std::string ticketAddress,
-                                             int numTickets,
-                                             std::string poolAddress,
-                                             double poolFee,
-                                             int64_t expiry,
-                                             CAmount ticketFeeIncrement,
-                                             CWalletError &error);
+       In case of error, the returned vector is empty. Check the error object for the reason. */
+    std::pair<std::vector<std::string>, CWalletError>
+    PurchaseTicket(std::string fromAccount,
+                   CAmount spendLimit,
+                   int minConf,
+                   std::string ticketAddress,
+                   int numTickets,
+                   std::string poolAddress,
+                   double poolFee,
+                   int64_t expiry,
+                   CAmount ticketFeeIncrement);
 
      /* Returns the ticket buyer */
      CTicketBuyer* GetTicketBuyer() { return ticketBuyer.get(); }

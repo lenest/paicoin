@@ -1421,9 +1421,10 @@ bool CWallet::IsHDEnabled() const
     return !hdChain.masterKeyID.IsNull();
 }
 
-std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmount spendLimit, int minConf, std::string ticketAddress, int numTickets, std::string poolAddress, double poolFee, int64_t expiry, CAmount ticketFeeIncrement, CWalletError &error)
+std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::string fromAccount, CAmount spendLimit, int minConf, std::string ticketAddress, int numTickets, std::string poolAddress, double poolFee, int64_t expiry, CAmount ticketFeeIncrement)
 {
     std::vector<std::string> results;
+    CWalletError error;
 
     LOCK2(cs_main, cs_wallet);
 
@@ -1431,12 +1432,12 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
 
     if (spendLimit <= 0) {
         error.Load(CWalletError::TYPE_ERROR, "Invalid spend limit");
-        return results;
+        return std::make_pair(results, error);
     }
 
     if (minConf < 0) {
         error.Load(CWalletError::INVALID_PARAMETER, "negative minconf");
-        return results;
+        return std::make_pair(results, error);
     }
 
     CTxDestination ticketAddr;
@@ -1444,7 +1445,7 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
         ticketAddr = DecodeDestination(ticketAddress);
         if (!IsValidDestination(ticketAddr)) {
             error.Load(CWalletError::INVALID_ADDRESS_OR_KEY, "Invalid ticket address");
-            return results;
+            return std::make_pair(results, error);
         }
     }
 
@@ -1453,14 +1454,14 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
         CPubKey newKey;
         if (!GetKeyFromPool(newKey)) {
             error.Load(CWalletError::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-            return results;
+            return std::make_pair(results, error);
         }
         ticketAddr = newKey.GetID();
     }
 
     if (numTickets < 1) {
         error.Load(CWalletError::INVALID_PARAMETER, "Number of tickets must be at least 1");
-        return results;
+        return std::make_pair(results, error);
     }
 
     CTxDestination poolAddr;
@@ -1468,7 +1469,7 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
         poolAddr = DecodeDestination(poolAddress);
         if (!IsValidDestination(poolAddr)) {
             error.Load(CWalletError::INVALID_ADDRESS_OR_KEY, "Invalid pool address");
-            return results;
+            return std::make_pair(results, error);
         }
     }
 
@@ -1479,11 +1480,11 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
 
     if (expiry < 0) {
         error.Load(CWalletError::INVALID_PARAMETER, "negative expiry");
-        return results;
+        return std::make_pair(results, error);
     }
     if (expiry > 0  && expiry <= chainActive.Height() + 1) {
         error.Load(CWalletError::INVALID_PARAMETER, "expiry height must be above next block height");
-        return results;
+        return std::make_pair(results, error);
     }
 
     // TODO Make sure this is handled correctly
@@ -1498,13 +1499,13 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
     // Ensure the ticket price does not exceed the spend limit if set.
     if (ticketPrice > spendLimit) {
         error.Load(CWalletError::INVALID_PARAMETER, "ticket price above spend limit");
-        return results;
+        return std::make_pair(results, error);
     }
 
     // Check sanity of poolfee
     if (IsValidDestination(poolAddr) && poolFee == 0.0) {
         error.Load(CWalletError::INVALID_PARAMETER, "stakepool fee percent unset");
-        return results;
+        return std::make_pair(results, error);
     }
 
     // check ticketAddr type, only P2PKH and P2SH are accepted
@@ -1517,14 +1518,14 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
 
     if (IsLocked()) {
         error.Load(CWalletError::WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
-        return results;
+        return std::make_pair(results, error);
     }
 
     // TODO make sure that the appropriate account is used
     CPubKey pubKey;
     if (!GetAccountPubkey(pubKey, "", true)) {
         error.Load(CWalletError::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-        return results;
+        return std::make_pair(results, error);
     }
     const auto& splitTxAddr = pubKey.GetID();
 
@@ -1532,12 +1533,12 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
         const auto curBalance = GetBalance();
         if (neededPerTicket > curBalance) {
             error.Load(CWalletError::WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
-            return results;
+            return std::make_pair(results, error);
         }
 
         if (GetBroadcastTransactions() && !g_connman) {
             error.Load(CWalletError::CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
-            return results;
+            return std::make_pair(results, error);
         }
 
         if (!IsValidDestination(poolAddr)) {
@@ -1557,7 +1558,7 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
             auto strFailReason = std::string{};
             if (!FundTransaction(mFundTx,nFeeRet,nChangePosInOut,strFailReason,false,{},CCoinControl{})) {
                 error.Load(CWalletError::WALLET_ERROR, strFailReason);
-                return results;
+                return std::make_pair(results, error);
             }
 
             CMutableTransaction mTicketTx;
@@ -1581,7 +1582,7 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
                         CPubKey newKey;
                         if (!GetKeyFromPool(newKey)) {
                             error.Load(CWalletError::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-                            return results;
+                            return std::make_pair(results, error);
                         }
                         rewardAddress = newKey.GetID();
                     }
@@ -1602,12 +1603,12 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
                 std::string reason;
                 if (!ValidateBuyTicketStructure(mTicketTx,reason)) {
                     error.Load(CWalletError::TRANSACTION_ERROR, "Error while constructing buy ticket transaction :" + reason);
-                    return results;
+                    return std::make_pair(results, error);
                 }
 
                 if (!SignTransaction(mTicketTx)) {
                     error.Load(CWalletError::TRANSACTION_ERROR, "Signing transaction failed");
-                    return results;
+                    return std::make_pair(results, error);
                 }
             }
             else {
@@ -1622,7 +1623,7 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
             CReserveKey reservekey{this};
             if (!CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
                 error.Load(CWalletError::TRANSACTION_ERROR, "CommitTransaction failed");
-                return results;
+                return std::make_pair(results, error);
             }
 
             results.push_back(wtx.GetHash().GetHex());
@@ -1630,11 +1631,11 @@ std::vector<std::string> CWallet::PurchaseTicket(std::string fromAccount, CAmoun
         else {
             // use pool adress
             error.Load(CWalletError::INVALID_PARAMETER, "Using pool address is not supported yet");
-            return results;
+            return std::make_pair(results, error);
         }
     }
 
-    return results;
+    return std::make_pair(results, error);
 }
 
 int64_t CWalletTx::GetTxTime() const

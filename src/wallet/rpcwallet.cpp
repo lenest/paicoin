@@ -3189,13 +3189,12 @@ UniValue purchaseticket(const JSONRPCRequest& request)
     if (!request.params[9].isNull())
         ticketFeeIncrement = AmountFromValue(request.params[9]);
 
-    CWalletError werror;
-    const auto&& txids = pwallet->PurchaseTicket(strAccount, nSpendLimit, nMinDepth, ticketAddress, nNumTickets, poolAddress, dfPoolFee, nExpiry, ticketFeeIncrement, werror);
-    if (txids.size() == 0 && werror.code != CWalletError::SUCCESSFUL)
-        throw JSONRPCErrorFromWalletError(werror);
+    const auto&& r = pwallet->PurchaseTicket(strAccount, nSpendLimit, nMinDepth, ticketAddress, nNumTickets, poolAddress, dfPoolFee, nExpiry, ticketFeeIncrement);
+    if (r.first.size() == 0 && r.second.code != CWalletError::SUCCESSFUL)
+        throw JSONRPCErrorFromWalletError(r.second);
 
     UniValue results{UniValue::VARR};
-    for (auto&& txid: txids) {
+    for (auto&& txid: r.first) {
         results.push_back(txid);
     }
 
