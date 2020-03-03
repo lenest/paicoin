@@ -3501,6 +3501,44 @@ UniValue setticketbuyerpooladdress(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
+UniValue setticketbuyerpoolfees(const JSONRPCRequest& request)
+{
+    const auto pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error{
+            "setticketbuyerpoolfees poolfees\n"
+            "\nConfigure the amount of fees to pay to the stake pool when automatically purchasing tickets.\n"
+            "\nArguments:\n"
+            "1.  poolfees  (numeric, required)  The amount of fees to pay to the stake pool\n"
+            "\nExample:\n"
+            + HelpExampleCli("setticketbuyerpoolfees", "1.23")
+        };
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    if (request.fHelp)
+        return true;
+
+    double value = request.params[0].get_real();
+    if (value < 0.0)
+        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "The pool fee cannot be negative.");
+
+    CTicketBuyer *tb = pwallet->GetTicketBuyer();
+    if (tb == nullptr)
+        throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
+
+    CTicketBuyerConfig& cfg = tb->GetConfig();
+
+    cfg.poolFees = value;
+
+    return NullUniValue;
+}
+
 UniValue generatevote(const JSONRPCRequest& request)
 {
     const auto pwallet = GetWalletForJSONRPCRequest(request);
@@ -4669,6 +4707,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "setticketbuyerbalancetomaintain",  &setticketbuyerbalancetomaintain,   {"maintain"} },
     { "wallet",             "setticketbuyervotingaddress",      &setticketbuyervotingaddress,       {"votingaddress"} },
     { "wallet",             "setticketbuyerpooladdress",        &setticketbuyerpooladdress,         {"pooladdress"} },
+    { "wallet",             "setticketbuyerpoolfees",           &setticketbuyerpoolfees,            {"pooladdress"} },
     { "wallet",             "generatevote",                     &generatevote,                      {"blockhash","height","tickethash","votebits","votebitsext"} },
     { "wallet",             "listwallets",                      &listwallets,                       {} },
     { "wallet",             "listscripts",                      &listscripts,                       {} },
