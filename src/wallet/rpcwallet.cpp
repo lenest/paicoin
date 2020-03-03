@@ -3375,7 +3375,7 @@ UniValue setticketbuyeraccount(const JSONRPCRequest& request)
     if (request.fHelp  || request.params.size() != 1)
         throw std::runtime_error{
             "setticketbuyeraccount \"fromaccount\"\n"
-            "\nConfigure the account to use for purchasing tickets.\n"
+            "\nConfigure the account to use for automatically purchasing tickets.\n"
             "\nArguments:\n"
             "1.  \"fromaccount\"     (string, required)    The account to use for purchase (default=\"default\")\n"
             "\nExample:\n"
@@ -3409,7 +3409,7 @@ UniValue setticketbuyerbalancetomaintain(const JSONRPCRequest& request)
     if (request.fHelp  || request.params.size() != 1)
         throw std::runtime_error{
             "setticketbuyerbalancetomaintain maintain\n"
-            "\nConfigure the minimum amount to maintain in purchasing account when purchasing tickets.\n"
+            "\nConfigure the minimum amount to maintain in purchasing account when automatically purchasing tickets.\n"
             "\nArguments:\n"
             "1.  maintain : n     (numeric, required)     minimum amount to maintain in purchasing account\n"
             "\nExample:\n"
@@ -3443,7 +3443,7 @@ UniValue setticketbuyervotingaddress(const JSONRPCRequest& request)
     if (request.fHelp  || request.params.size() != 1)
         throw std::runtime_error{
             "setticketbuyervotingaddress \"votingaddress\"\n"
-            "\nConfigure the address to assign voting rights when purchasing tickets; overrides votingaccount.\n"
+            "\nConfigure the address to assign voting rights when automatically purchasing tickets; overrides votingaccount.\n"
             "\nArguments:\n"
             "1.  \"votingaddress\" : \"votingaddress\"     (string, required)     address to assign voting rights\n"
             "\nExample:\n"
@@ -3463,6 +3463,40 @@ UniValue setticketbuyervotingaddress(const JSONRPCRequest& request)
     CTicketBuyerConfig& cfg = tb->GetConfig();
 
     cfg.votingAddress = request.params[0].get_str();
+
+    return NullUniValue;
+}
+
+UniValue setticketbuyerpooladdress(const JSONRPCRequest& request)
+{
+    const auto pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp  || request.params.size() != 1)
+        throw std::runtime_error{
+            "setticketbuyerpooladdress \"pooladdress\"\n"
+            "\nConfigure the address to pay stake pool fees to when automatically purchasing tickets.\n"
+            "\nArguments:\n"
+            "1.  \"pooladdress\" : \"pooladdress\"     (string, required)     address to pay stake pool fees to\n"
+            "\nExample:\n"
+            + HelpExampleCli("setticketbuyerpooladdress", "address_of_the_pool")
+        };
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    if (request.fHelp)
+        return true;
+
+    CTicketBuyer *tb = pwallet->GetTicketBuyer();
+    if (tb == nullptr)
+        throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
+
+    CTicketBuyerConfig& cfg = tb->GetConfig();
+
+    cfg.poolFeeAddress = request.params[0].get_str();
 
     return NullUniValue;
 }
@@ -4634,6 +4668,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "setticketbuyeraccount",            &setticketbuyeraccount,             {"fromaccount"} },
     { "wallet",             "setticketbuyerbalancetomaintain",  &setticketbuyerbalancetomaintain,   {"maintain"} },
     { "wallet",             "setticketbuyervotingaddress",      &setticketbuyervotingaddress,       {"votingaddress"} },
+    { "wallet",             "setticketbuyerpooladdress",        &setticketbuyerpooladdress,         {"pooladdress"} },
     { "wallet",             "generatevote",                     &generatevote,                      {"blockhash","height","tickethash","votebits","votebitsext"} },
     { "wallet",             "listwallets",                      &listwallets,                       {} },
     { "wallet",             "listscripts",                      &listscripts,                       {} },
