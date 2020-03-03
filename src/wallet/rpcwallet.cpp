@@ -3124,16 +3124,16 @@ UniValue purchaseticket(const JSONRPCRequest& request)
             "purchaseticket \"fromaccount\" spendlimit (minconf=1 \"ticketaddress\" numtickets \"pooladdress\" poolfees expiry \"comment\" ticketfee)\n"
             "\nPurchase ticket using available funds.\n"
             "\nArguments:\n"
-            "1.  \"fromaccount\"    (string, required)             The account to use for purchase (default=\"default\")\n"
-            "2.  spendlimit       (numeric, required)            Limit on the amount to spend on ticket\n"
-            "3.  minconf          (numeric, optional, default=1) Minimum number of block confirmations required\n"
-            "4.  ticketaddress    (string, optional)             Override the ticket address to which voting rights are given\n"
-            "5.  numtickets       (numeric, optional)            The number of tickets to purchase\n"
-            "6.  pooladdress      (string, optional)             The address to pay stake pool fees to\n"
-            "7.  poolfees         (numeric, optional)            The amount of fees to pay to the stake pool\n"
-            "8.  expiry           (numeric, optional)            Height at which the purchase tickets expire\n"
-            "9.  comment          (string, optional)             Unused\n"
-            "10. ticketfee        (numeric, optional)            The transaction fee rate (PAI/kB) to use (overrides fees set by the wallet config or settxfee RPC)\n"
+            "1.  \"fromaccount\"     (string, required)             The account to use for purchase (default=\"default\")\n"
+            "2.  spendlimit         (numeric, required)            Limit on the amount to spend on ticket\n"
+            "3.  minconf            (numeric, optional, default=1) Minimum number of block confirmations required\n"
+            "4.  \"ticketaddress\"   (string, optional)             Override the ticket address to which voting rights are given\n"
+            "5.  numtickets         (numeric, optional)            The number of tickets to purchase\n"
+            "6.  \"pooladdress\"     (string, optional)             The address to pay stake pool fees to\n"
+            "7.  poolfees           (numeric, optional)            The amount of fees to pay to the stake pool\n"
+            "8.  expiry             (numeric, optional)            Height at which the purchase tickets expire\n"
+            "9.  \"comment\"         (string, optional)             Unused\n"
+            "10. ticketfee          (numeric, optional)            The transaction fee rate (PAI/kB) to use (overrides fees set by the wallet config or settxfee RPC)\n"
 
             "\nResult:\n"
             "\"value\"              (string) Hash of the resulting ticket\n"
@@ -3215,14 +3215,14 @@ UniValue startticketbuyer(const JSONRPCRequest& request)
             "\nStart the automatic ticket buyer with the specified settings.\n"
             + HelpRequiringPassphrase(pwallet) +
             "\nArguments:\n"
-            "1.  \"fromaccount\"     (string, required)    The account to use for purchase (default=\"default\")\n"
-            "2.  maintain           (numeric, required)   Minimum amount to maintain in purchasing account\n"
-            "3.  \"passphrase\"     (string, optional)    The passphrase to use for unlocking the wallet\n"
-            "4.  \"votingaccount\"  (string, optional)    Account to derive voting addresses from; overridden by votingaddress\n"
-            "5.  \"votingaddress\"  (string, optional)    Address to assign voting rights; overrides votingaccount\n"
-            "6.  \"poolfeeaddress\" (string, optional)    The address to pay stake pool fees to\n"
-            "7.  poolfees           (numeric, optional)   The amount of fees to pay to the stake pool\n"
-            "8.  limit              (numeric, optional)   Limit maximum number of purchased tickets per block\n"
+            "1.  \"fromaccount\"      (string, required)   The account to use for purchase (default=\"default\")\n"
+            "2.  maintain             (numeric, required)  Minimum amount to maintain in purchasing account\n"
+            "3.  \"passphrase\"       (string, optional)   The passphrase to use for unlocking the wallet\n"
+            "4.  \"votingaccount\"    (string, optional)   Account to derive voting addresses from; overridden by votingaddress\n"
+            "5.  \"votingaddress\"    (string, optional)   Address to assign voting rights; overrides votingaccount\n"
+            "6.  \"poolfeeaddress\"   (string, optional)   The address to pay stake pool fees to\n"
+            "7.  poolfees             (numeric, optional)  The amount of fees to pay to the stake pool\n"
+            "8.  limit                (numeric, optional)  Limit maximum number of purchased tickets per block\n"
             "\nExamples:\n"
             "\nStart the ticket buyer from your default account to purchase tickets and leaving at least 50 PAI\n"
             + HelpExampleCli("startticketbuyer", "\"default\" 50") +
@@ -3270,12 +3270,20 @@ UniValue startticketbuyer(const JSONRPCRequest& request)
         cfg.poolFeeAddress = request.params[5].get_str();
 
     // Pool fees
-    if (!request.params[6].isNull())
-        cfg.poolFees = request.params[6].get_real();
+    if (!request.params[6].isNull()) {
+        double value = request.params[6].get_real();
+        if (value < 0.0)
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "The pool fee cannot be negative.");
+        cfg.poolFees = value;
+    }
 
-    // Pool fees
-    if (!request.params[7].isNull())
-        cfg.limit = request.params[7].get_int();
+    // Limit
+    if (!request.params[7].isNull()) {
+        int value = request.params[7].get_int();
+        if (value < 0)
+            throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "The limit cannot be negative.");
+        cfg.limit = value;
+    }
 
     tb->start();
 
@@ -3372,12 +3380,12 @@ UniValue setticketbuyeraccount(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (request.fHelp  || request.params.size() != 1)
+    if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error{
             "setticketbuyeraccount \"fromaccount\"\n"
             "\nConfigure the account to use for automatically purchasing tickets.\n"
             "\nArguments:\n"
-            "1.  \"fromaccount\"     (string, required)    The account to use for purchase (default=\"default\")\n"
+            "1.  \"fromaccount\"  (string, required)  The account to use for purchase (default=\"default\")\n"
             "\nExample:\n"
             + HelpExampleCli("setticketbuyeraccount", "\"default\"")
         };
@@ -3406,12 +3414,12 @@ UniValue setticketbuyerbalancetomaintain(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (request.fHelp  || request.params.size() != 1)
+    if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error{
             "setticketbuyerbalancetomaintain maintain\n"
             "\nConfigure the minimum amount to maintain in purchasing account when automatically purchasing tickets.\n"
             "\nArguments:\n"
-            "1.  maintain : n     (numeric, required)     minimum amount to maintain in purchasing account\n"
+            "1.  maintain  (numeric, required)  The minimum amount to maintain in purchasing account\n"
             "\nExample:\n"
             + HelpExampleCli("setticketbuyerbalancetomaintain", "50")
         };
@@ -3440,12 +3448,12 @@ UniValue setticketbuyervotingaddress(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (request.fHelp  || request.params.size() != 1)
+    if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error{
             "setticketbuyervotingaddress \"votingaddress\"\n"
             "\nConfigure the address to assign voting rights when automatically purchasing tickets; overrides votingaccount.\n"
             "\nArguments:\n"
-            "1.  \"votingaddress\" : \"votingaddress\"     (string, required)     address to assign voting rights\n"
+            "1.  \"votingaddress\"  (string, required)  The address to assign voting rights\n"
             "\nExample:\n"
             + HelpExampleCli("setticketbuyervotingaddress", "your_address")
         };
@@ -3474,12 +3482,12 @@ UniValue setticketbuyerpooladdress(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (request.fHelp  || request.params.size() != 1)
+    if (request.fHelp || request.params.size() != 1)
         throw std::runtime_error{
             "setticketbuyerpooladdress \"pooladdress\"\n"
             "\nConfigure the address to pay stake pool fees to when automatically purchasing tickets.\n"
             "\nArguments:\n"
-            "1.  \"pooladdress\" : \"pooladdress\"     (string, required)     address to pay stake pool fees to\n"
+            "1.  \"pooladdress\"  (string, required)  The address to pay stake pool fees to\n"
             "\nExample:\n"
             + HelpExampleCli("setticketbuyerpooladdress", "address_of_the_pool")
         };

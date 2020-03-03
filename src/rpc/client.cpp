@@ -168,6 +168,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "startticketbuyer", 1, "maintain" },
     { "startticketbuyer", 6, "poolfees" },
     { "startticketbuyer", 7, "limit" },
+    { "setticketbuyerbalancetomaintain", 0, "maintain" },
     { "setticketbuyerpoolfees", 0, "poolfees" },
     // Echo with conversion (For testing only)
     { "echojson", 0, "arg0" },
