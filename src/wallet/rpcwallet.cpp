@@ -3547,6 +3547,44 @@ UniValue setticketbuyerpoolfees(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
+UniValue setticketbuyermaxperblock(const JSONRPCRequest& request)
+{
+    const auto pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error{
+            "setticketbuyermaxperblock limit\n"
+            "\nConfigure the maximum number of purchased tickets per block when automatically purchasing tickets.\n"
+            "\nArguments:\n"
+            "1.  setticketbuyermaxperblock  (numeric, required)  The maximum number of purchased tickets per block\n"
+            "\nExample:\n"
+            + HelpExampleCli("setticketbuyermaxperblock", "1")
+        };
+
+    ObserveSafeMode();
+    LOCK2(cs_main, pwallet->cs_wallet);
+
+    if (request.fHelp)
+        return true;
+
+    int value = request.params[0].get_int();
+    if (value < 1)
+        throw JSONRPCError(RPCErrorCode::INVALID_PARAMETER, "The maximum number of purchased tickets per block cannot be zero or negative.");
+
+    CTicketBuyer *tb = pwallet->GetTicketBuyer();
+    if (tb == nullptr)
+        throw JSONRPCError(RPCErrorCode::INTERNAL_ERROR, "Ticket buyer not found");
+
+    CTicketBuyerConfig& cfg = tb->GetConfig();
+
+    cfg.limit = value;
+
+    return NullUniValue;
+}
+
 UniValue generatevote(const JSONRPCRequest& request)
 {
     const auto pwallet = GetWalletForJSONRPCRequest(request);
@@ -4715,7 +4753,8 @@ static const CRPCCommand commands[] =
     { "wallet",             "setticketbuyerbalancetomaintain",  &setticketbuyerbalancetomaintain,   {"maintain"} },
     { "wallet",             "setticketbuyervotingaddress",      &setticketbuyervotingaddress,       {"votingaddress"} },
     { "wallet",             "setticketbuyerpooladdress",        &setticketbuyerpooladdress,         {"pooladdress"} },
-    { "wallet",             "setticketbuyerpoolfees",           &setticketbuyerpoolfees,            {"pooladdress"} },
+    { "wallet",             "setticketbuyerpoolfees",           &setticketbuyerpoolfees,            {"poolfees"} },
+    { "wallet",             "setticketbuyermaxperblock",        &setticketbuyermaxperblock,         {"limit"} },
     { "wallet",             "generatevote",                     &generatevote,                      {"blockhash","height","tickethash","votebits","votebitsext"} },
     { "wallet",             "listwallets",                      &listwallets,                       {} },
     { "wallet",             "listscripts",                      &listscripts,                       {} },
