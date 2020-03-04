@@ -64,6 +64,7 @@ void CTicketBuyer::mainLoop()
     CAmount sdiff{0};
     int buy{0};
     int max{0};
+    bool shouldRelock{false};
 
     while (shouldRun.load()) {
         // wait until activated
@@ -83,12 +84,16 @@ void CTicketBuyer::mainLoop()
         // unlock wallet
         // TODO add password to the config
         // TODO add proper error handling
-        if (pwallet->IsLocked() && ! pwallet->Unlock(config.passphrase)) {
+        shouldRelock = pwallet->IsLocked();
+        if (shouldRelock && ! pwallet->Unlock(config.passphrase)) {
+            LogPrintf("CTicketBuyer: Purchased tickets: Wrong passphrase");
             break;
         }
 
-        if (chainActive.Tip() == nullptr)
+        if (chainActive.Tip() == nullptr) {
+            if (shouldRelock) pwallet->Lock();
             continue;
+        }
 
         // calculate the height of the first block in the
         // next stake difficulty interval:
@@ -103,6 +108,7 @@ void CTicketBuyer::mainLoop()
             // that the ticket purchase spends.
             if (height + 2 == nextIntervalStart) {
                 LogPrintf("CTicketBuyer: Skipping purchase: next sdiff interval starts soon");
+                if (shouldRelock) pwallet->Lock();
                 continue;
             }
 
@@ -122,13 +128,16 @@ void CTicketBuyer::mainLoop()
         // synced through the tip block.
 
         // Cannot purchase tickets if not broadcasting
-        if (! pwallet->GetBroadcastTransactions())
+        if (! pwallet->GetBroadcastTransactions()) {
+            if (shouldRelock) pwallet->Lock();
             continue;
+        }
 
         // Determine how many tickets to buy
         spendable = pwallet->GetAvailableBalance();
         if (spendable < config.maintain) {
             LogPrintf("CTicketBuyer: Skipping purchase: low available balance");
+            if (shouldRelock) pwallet->Lock();
             continue;
         }
         spendable -= config.maintain;
@@ -138,6 +147,7 @@ void CTicketBuyer::mainLoop()
         buy = static_cast<int>(spendable / sdiff);
         if (buy == 0) {
             LogPrintf("CTicketBuyer: Skipping purchase: low available balance");
+            if (shouldRelock) pwallet->Lock();
             continue;
         }
 
@@ -154,5 +164,7 @@ void CTicketBuyer::mainLoop()
         } else {
             LogPrintf("CTicketBuyer: Failed to purchase tickets: (%d) %s", r.second.code, r.second.message.c_str());
         }
+
+        if (shouldRelock) pwallet->Lock();
     }
 }
