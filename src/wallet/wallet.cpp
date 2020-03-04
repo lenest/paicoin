@@ -1514,7 +1514,7 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
 
     // TODO Calculate the current ticket price.
     //ticketPrice, err := w.NextStakeDifficulty()
-    const auto& ticketPrice = CAmount{34500};
+    const auto& ticketPrice = calcNextRequiredStakeDifficulty(chainActive.Tip()->GetBlockHeader(), chainActive.Tip(), Params());
 
     // Ensure the ticket price does not exceed the spend limit if set.
     if (ticketPrice > spendLimit) {
