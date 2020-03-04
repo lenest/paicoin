@@ -416,6 +416,26 @@ bool CWallet::ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase,
     return false;
 }
 
+bool CWallet::VerifyWalletPassphrase(const SecureString& strWalletPassphrase)
+{
+    CCrypter crypter;
+    CKeyingMaterial _vMasterKey;
+
+    {
+        LOCK(cs_wallet);
+        for (const MasterKeyMap::value_type& pMasterKey : mapMasterKeys)
+        {
+            if(!crypter.SetKeyFromPassphrase(strWalletPassphrase, pMasterKey.second.vchSalt, pMasterKey.second.nDeriveIterations, pMasterKey.second.nDerivationMethod))
+                return false;
+            if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, _vMasterKey))
+                continue; // try another master key
+            if (CCryptoKeyStore::VerifyMasterKey(_vMasterKey))
+                return true;
+        }
+    }
+    return false;
+}
+
 void CWallet::SetBestChain(const CBlockLocator& loc)
 {
     CWalletDB walletdb(*dbw);

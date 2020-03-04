@@ -3254,6 +3254,23 @@ UniValue startticketbuyer(const JSONRPCRequest& request)
         passphrase = request.params[2].get_str().c_str();
     }
 
+    // verify the validity of the passphrase
+    if (pwallet->IsCrypted()) {
+        if (passphrase.length() > 0) {
+            if (pwallet->IsLocked()) {
+                if (pwallet->Unlock(passphrase))
+                    LockWallet(pwallet);
+                else
+                    throw JSONRPCError(RPCErrorCode::WALLET_PASSPHRASE_INCORRECT, "Error: The wallet passphrase entered was incorrect.");
+            } else {
+                if (!pwallet->VerifyWalletPassphrase(passphrase))
+                    throw JSONRPCError(RPCErrorCode::WALLET_PASSPHRASE_INCORRECT, "Error: The wallet passphrase entered was incorrect.");
+            }
+        } else
+            throw JSONRPCError(RPCErrorCode::WALLET_WRONG_ENC_STATE, "Error: running with an encrypted wallet, but no passphrase was specified.");
+    } else if (passphrase.length() > 0)
+        throw JSONRPCError(RPCErrorCode::WALLET_WRONG_ENC_STATE, "Error: running with an unencrypted wallet, but passphrase was specified.");
+
     // Voting account
     std::string votingAccount;
     if (!request.params[3].isNull())
