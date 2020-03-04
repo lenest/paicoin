@@ -7,17 +7,11 @@
 #include "validation.h"
 #include <numeric>
 
-CTicketBuyer::CTicketBuyer(CWallet* wallet)
-{
-    pwallet = wallet;
-}
-
-CTicketBuyer::CTicketBuyer(CTicketBuyer&& o) :
-    config(std::move(o.config)),
-    pwallet(o.pwallet),
+CTicketBuyer::CTicketBuyer(CWallet* wallet) :
+    shouldRun(true),
     thread(&CTicketBuyer::mainLoop, this)
 {
-    shouldRun.store(true);
+    pwallet = wallet;
     ::RegisterValidationInterface(this);
 }
 

@@ -19,7 +19,6 @@ class CTicketBuyer : public CValidationInterface {
 public:
     CTicketBuyer() = delete;
     CTicketBuyer(CWallet* wallet);
-    CTicketBuyer(CTicketBuyer&& o);
     virtual ~CTicketBuyer();
 
     virtual void UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockIndex *pindexFork, bool fInitialDownload);
