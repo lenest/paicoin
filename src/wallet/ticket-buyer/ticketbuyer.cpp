@@ -57,7 +57,6 @@ void CTicketBuyer::stop()
 
 void CTicketBuyer::mainLoop()
 {
-    CBlockIndex* chainTip = nullptr;
     int64_t height{0};
     int64_t nextIntervalStart{0}, currentInterval{0}, intervalSize{Params().GetConsensus().nStakeDiffWindowSize};
     int64_t expiry{0};
@@ -88,13 +87,12 @@ void CTicketBuyer::mainLoop()
             break;
         }
 
-        chainTip = chainActive.Tip();
-        if (chainTip == nullptr)
+        if (chainActive.Tip() == nullptr)
             continue;
 
         // calculate the height of the first block in the
         // next stake difficulty interval:
-        height = chainTip->nHeight;
+        height = chainActive.Height();
         if (height + 2 >= nextIntervalStart) {
             currentInterval = height / intervalSize + 1;
             nextIntervalStart = currentInterval * intervalSize;
@@ -135,7 +133,7 @@ void CTicketBuyer::mainLoop()
         }
         spendable -= config.maintain;
 
-        sdiff = calcNextRequiredStakeDifficulty(chainTip->GetBlockHeader(), chainTip, Params());
+        sdiff = calcNextRequiredStakeDifficulty(chainActive.Tip()->GetBlockHeader(), chainActive.Tip(), Params());
 
         buy = static_cast<int>(spendable / sdiff);
         if (buy == 0) {
