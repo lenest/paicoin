@@ -789,14 +789,18 @@ public:
     unsigned int nMasterKeyMaxID;
 
     // Create wallet with dummy database handle
-    CWallet(): dbw(new CWalletDBWrapper())
+    CWallet() :
+        dbw(new CWalletDBWrapper()),
+        ticketFeeIncrement(minTxFee)
     {
         ticketBuyer = MakeUnique<CTicketBuyer>(this);
         SetNull();
     }
 
     // Create wallet with passed-in database handle
-    explicit CWallet(std::unique_ptr<CWalletDBWrapper> dbw_in) : dbw(std::move(dbw_in))
+    explicit CWallet(std::unique_ptr<CWalletDBWrapper> dbw_in) :
+        dbw(std::move(dbw_in)),
+        ticketFeeIncrement(minTxFee)
     {
         ticketBuyer = MakeUnique<CTicketBuyer>(this);
         SetNull();
@@ -991,6 +995,9 @@ public:
     static CFeeRate minTxFee;
     static CFeeRate fallbackFee;
     static CFeeRate m_discard_rate;
+
+    // wallet's ticket fee rate
+    CFeeRate ticketFeeIncrement;
 
     bool NewKeyPool();
     size_t KeypoolCountExternalKeys();

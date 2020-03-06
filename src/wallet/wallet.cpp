@@ -1507,11 +1507,6 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
         return std::make_pair(results, error);
     }
 
-    // TODO Make sure this is handled correctly
-    if (ticketFeeIncrement == 0) {
-        // TODO read the wallet's default increment
-    }
-
     // TODO Calculate the current ticket price.
     //ticketPrice, err := w.NextStakeDifficulty()
     const auto& ticketPrice = calcNextRequiredStakeDifficulty(chainActive.Tip()->GetBlockHeader(), chainActive.Tip(), Params());
@@ -1531,8 +1526,35 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
     // check ticketAddr type, only P2PKH and P2SH are accepted
     // seems to always be the case while the address is valid
 
-    // TODO calculate ticket fee based on estimated size and the ticketFee parameter
-    const auto& ticketFee = CAmount{1000};
+    // TODO Make sure this is handled correctly
+    CFeeRate ticketFeeRate{ticketFeeIncrement};
+    if (ticketFeeIncrement == 0) {
+        ticketFeeRate = this->ticketFeeIncrement;
+    }
+
+    // create the scripts that define the transaction outputs
+    // they will also be used in transaction size estimation
+
+    BuyTicketData buyTicketData = { 1 };    // version
+    CScript declScript = GetScriptForBuyTicketDecl(buyTicketData);
+    CTxOut declTxOut(0, declScript);
+
+    CScript ticketScript = GetScriptForDestination(ticketAddr);
+    CTxOut ticketAddrTxOut(ticketPrice, ticketScript);
+
+    TicketContribData dummyTicketContribData = { 1, CKeyID(), ticketPrice };          // this is NOT used in the actually transaction, but only for size estimations
+    CScript dummyContributorInfoScript = GetScriptForTicketContrib(dummyTicketContribData);
+    CTxOut dummyContributorInfoTxOut(1, dummyContributorInfoScript);
+
+    CScript dummyChangeScript = GetScriptForDestination(CKeyID());
+    CTxOut dummyChangeTxOut(1, dummyChangeScript);
+
+    // propose a fee for a mininum size of the ticket
+    // version + in count (1) + 1 regular input + out count (4) + buy ticket decl output + ticket address output + contributor info output + change output + locktime
+    // this will then be readjusted as the final ticket is built
+    size_t estimatedMinSize = 4 + 1 + 147 + 1 + GetSerializeSize(declTxOut, SER_NETWORK, PROTOCOL_VERSION) + GetSerializeSize(ticketAddrTxOut, SER_NETWORK, PROTOCOL_VERSION) + GetSerializeSize(dummyContributorInfoTxOut, SER_NETWORK, PROTOCOL_VERSION) + GetSerializeSize(dummyChangeTxOut, SER_NETWORK, PROTOCOL_VERSION);
+    CAmount ticketFee{ticketFeeRate.GetFee(estimatedMinSize)};
+
     const auto& neededPerTicket = ticketPrice + ticketFee;
     assert(neededPerTicket > 0);
 
@@ -1582,57 +1604,59 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
             }
 
             CMutableTransaction mTicketTx;
-            BuyTicketData buyTicketData = { 1 };    // version
-            CScript declScript = GetScriptForBuyTicketDecl(buyTicketData);
-            mTicketTx.vout.push_back(CTxOut(0, declScript));
+            mTicketTx.vout.push_back(declTxOut);
 
             // create an output that pays ticket stake
-            CScript ticketScript = GetScriptForDestination(ticketAddr);
-            mTicketTx.vout.push_back(CTxOut(ticketPrice, ticketScript));
+            mTicketTx.vout.push_back(ticketAddrTxOut);
 
-            if (mFundTx.vin.size() == 1) {
-                //TODO only working for one input, fix this
-                for (const auto& input : mFundTx.vin)
-                {
-                    mTicketTx.vin.push_back(input);
+            // TODO: Make sure that the usage of multiple inputs for the ticket purchase transaction is correct
+            for (const auto& input : mFundTx.vin)
+                mTicketTx.vin.push_back(input);
 
-                    CKeyID rewardAddress;
-                    {
-                        // Generate a new key that is added to wallet
-                        CPubKey newKey;
-                        if (!GetKeyFromPool(newKey)) {
-                            error.Load(CWalletError::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-                            return std::make_pair(results, error);
-                        }
-                        rewardAddress = newKey.GetID();
-                    }
-                    const auto& contributedAmount = neededPerTicket; // in case no pool is used, this is equal to the price
-                    TicketContribData ticketContribData = { 1, rewardAddress, contributedAmount };
-                    CScript contributorInfoScript = GetScriptForTicketContrib(ticketContribData);
-                    mTicketTx.vout.push_back(CTxOut(0, contributorInfoScript));
-
-                    // create an output which pays back change
-                    auto changeKey = CKey();
-                    changeKey.MakeNewKey(false);
-                    auto changeAddr = changeKey.GetPubKey().GetID();
-                    CAmount change = mFundTx.vout[nChangePosInOut].nValue + nFeeRet;
-                    assert(change >= 0);
-                    CScript changeScript = GetScriptForDestination(changeAddr);
-                    mTicketTx.vout.push_back(CTxOut(change, changeScript));
-                }
-                std::string reason;
-                if (!ValidateBuyTicketStructure(mTicketTx,reason)) {
-                    error.Load(CWalletError::TRANSACTION_ERROR, "Error while constructing buy ticket transaction :" + reason);
+            CKeyID rewardAddress;
+            {
+                // Generate a new key that is added to wallet
+                CPubKey newKey;
+                if (!GetKeyFromPool(newKey)) {
+                    error.Load(CWalletError::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
                     return std::make_pair(results, error);
                 }
-
-                if (!SignTransaction(mTicketTx)) {
-                    error.Load(CWalletError::TRANSACTION_ERROR, "Signing transaction failed");
-                    return std::make_pair(results, error);
-                }
+                rewardAddress = newKey.GetID();
             }
+            const auto& contributedAmount = neededPerTicket; // in case no pool is used, this is equal to the price
+            TicketContribData ticketContribData = { 1, rewardAddress, contributedAmount };
+            CScript contributorInfoScript = GetScriptForTicketContrib(ticketContribData);
+            mTicketTx.vout.push_back(CTxOut(0, contributorInfoScript));
+
+            // create an output which pays back change
+            auto changeKey = CKey();
+            changeKey.MakeNewKey(false);    // TODO: is this ok? shouldn't it be an internal address?
+            auto changeAddr = changeKey.GetPubKey().GetID();
+            CAmount change = mFundTx.vout[nChangePosInOut].nValue + nFeeRet;
+            assert(change >= 0);
+            CScript changeScript = GetScriptForDestination(changeAddr);
+            mTicketTx.vout.push_back(CTxOut(change, changeScript));
+
+            // since the ticket transaction is now complete,
+            // subtract the ticket fee from the change.
+            // If the ticket fee is larger than the change,
+            // try finding new inputs to fund the transaction.
+            ticketFee = ticketFeeRate.GetFee(GetSerializeSize(mTicketTx, SER_NETWORK, PROTOCOL_VERSION));
+            if (ticketFee < mTicketTx.vout.back().nValue)
+                mTicketTx.vout.back().nValue -= ticketFee;
             else {
-                assert(!"Purchase ticket tx with multiple inputs not yet supported!");
+                // TODO: make sure that the transaction funds are extended if needed with new inputs!
+            }
+
+            std::string reason;
+            if (!ValidateBuyTicketStructure(mTicketTx,reason)) {
+                error.Load(CWalletError::TRANSACTION_ERROR, "Error while constructing buy ticket transaction :" + reason);
+                return std::make_pair(results, error);
+            }
+
+            if (!SignTransaction(mTicketTx)) {
+                error.Load(CWalletError::TRANSACTION_ERROR, "Signing transaction failed");
+                return std::make_pair(results, error);
             }
 
             CValidationState state;
