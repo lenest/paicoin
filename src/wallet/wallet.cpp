@@ -1653,9 +1653,16 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
                 // subtract the ticket fee from the change.
                 // If the ticket fee is larger than the change,
                 // try finding new inputs to fund the transaction.
+                // Also, use the highest of the fees:
+                // if the ticket fee is larger use that,
+                // otherwise, use the normal transaction fee.
                 ticketFee = ticketFeeRate.GetFee(GetSerializeSize(mTicketTx, SER_NETWORK, PROTOCOL_VERSION));
                 if (ticketFee < mTicketTx.vout.back().nValue) {
-                    mTicketTx.vout.back().nValue -= ticketFee;
+                    if (ticketFee > nFeeRet)
+                        mTicketTx.vout.back().nValue -= ticketFee;
+                    else
+                        mTicketTx.vout.back().nValue -= nFeeRet;
+
                     extendFunding = false;
                 } else {
                     neededPerTicket = ticketPrice + ticketFee;
