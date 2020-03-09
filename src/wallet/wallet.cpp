@@ -1641,9 +1641,16 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
                 mTicketTx.vout.push_back(CTxOut(0, contributorInfoScript));
 
                 // create an output which pays back change
-                auto changeKey = CKey();
-                changeKey.MakeNewKey(false);    // TODO: is this ok? shouldn't it be an internal address?
-                auto changeAddr = changeKey.GetPubKey().GetID();
+                CKeyID changeAddr;
+                {
+                    // Generate a new internal key that is added to wallet
+                    CPubKey newKey;
+                    if (!GetKeyFromPool(newKey, true)) {
+                        error.Load(CWalletError::WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+                        return std::make_pair(results, error);
+                    }
+                    changeAddr = newKey.GetID();
+                }
                 CAmount change = mFundTx.vout[nChangePosInOut].nValue + nFeeRet;
                 assert(change >= 0);
                 CScript changeScript = GetScriptForDestination(changeAddr);
