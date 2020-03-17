@@ -194,6 +194,24 @@ bool ParseTicketContrib(const CTransaction& tx, uint32_t txoutIndex, TicketContr
     return true;
 }
 
+bool ParsePoolFee(const CTransaction& tx, uint32_t txoutIndex, PoolFeeData& data)
+{
+    int numItems = 7;   // structVersion, dataClass, stakeDataClass, poolFeeVersion, poolAddr, isScriptHash, poolFee
+    std::vector<std::vector<unsigned char> > items;
+    if (!ParseStakeData(tx, txoutIndex, STAKE_PoolFee, numItems, items))
+        return false;
+
+    data.nVersion = CScriptNum(items[poolVersionIndex], false).getint();
+    if (data.nVersion != 1)
+        return false;
+
+    data.poolAddr = uint160(items[poolAddrIndex]);
+    data.isScriptHash = CScriptNum(items[poolIsScriptHashIndex], false).getint();
+    data.poolFee = CScriptNum(items[poolFeeIndex], false).getint(); // CScriptNum can handle 32-byte integers; is that enough?
+    //data.poolFee = base_blob<64>(items[poolFeeIndex]).GetUint64(0); // this parses uint64 but not int64
+    return true;
+}
+
 bool ParseVote(const CTransaction& tx, VoteData& data)
 {
     int numItems = 8;   // structVersion, dataClass, stakeDataClass, txClass, voteVersion, blockHash, blockHeight, voteBits

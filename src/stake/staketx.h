@@ -98,6 +98,11 @@ const uint32_t voteBitsIndex = 7;
 const uint32_t contribVersionIndex = 3;
 const uint32_t contribAddrIndex = 4;
 const uint32_t contribAmountIndex = 5;
+//---
+const uint32_t poolVersionIndex = 3;
+const uint32_t poolAddrIndex = 4;
+const uint32_t poolIsScriptHashIndex = 5;
+const uint32_t poolFeeIndex = 6;
 
 enum ETxClass {         // these values must not be changed (they are stored in scripts), so only appending is allowed
     TX_Regular,
@@ -108,6 +113,7 @@ enum ETxClass {         // these values must not be changed (they are stored in 
 
 ETxClass ParseTxClass(const CTransaction& tx);
 bool ParseTicketContrib(const CTransaction& tx, uint32_t txoutIndex, TicketContribData& data);
+bool ParsePoolFee(const CTransaction& tx, uint32_t txoutIndex, PoolFeeData& data);
 bool ParseVote(const CTransaction& tx, VoteData& data);
 bool IsStakeTx(ETxClass txClass);
 
