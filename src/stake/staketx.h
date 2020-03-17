@@ -26,7 +26,8 @@ bool ValidateDataTxoutStructure(const CTransaction& tx, uint32_t txoutIndex,
 
 enum EStakeDataClass {         // these values must not be changed (they are stored in scripts), so only appending is allowed
     STAKE_TxDeclaration,
-    STAKE_TicketContribution
+    STAKE_TicketContribution,
+    STAKE_PoolFee
 };
 
 struct BuyTicketData {
@@ -37,6 +38,13 @@ struct TicketContribData {
     int nVersion;
     uint160 rewardAddr;
     CAmount contributedAmount;
+};
+
+struct PoolFeeData {
+    int nVersion;
+    uint160 poolAddr;
+    bool isScriptHash;  // TODO is there a better way to represent this?
+    CAmount poolFee;
 };
 
 struct VoteData {
@@ -52,6 +60,7 @@ struct RevokeTicketData {
 
 CScript GetScriptForBuyTicketDecl(const BuyTicketData& data);
 CScript GetScriptForTicketContrib(const TicketContribData& data);
+CScript GetScriptForPoolFee(const PoolFeeData& data);
 CScript GetScriptForVoteDecl(const VoteData& data);
 CScript GetScriptForRevokeTicketDecl(const RevokeTicketData& data);
 
@@ -71,6 +80,7 @@ const uint32_t txdeclOutputIndex = 0;
 const uint32_t ticketStakeOutputIndex = 1;
 const uint32_t ticketContribOutputIndex = 2;
 const uint32_t ticketChangeOutputIndex = 3;
+const uint32_t ticketPoolFeeOutputIndex = 4;
 const uint32_t voteRewardOutputIndex = 1;
 const uint32_t revocationRefundOutputIndex = 1;
 

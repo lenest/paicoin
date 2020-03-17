@@ -107,6 +107,16 @@ CScript GetScriptForTicketContrib(const TicketContribData& data)
                     << ToByteVector(data.rewardAddr) << data.contributedAmount;
 }
 
+CScript GetScriptForPoolFee(const PoolFeeData& data)
+{
+    int nPoolFeeVersion = 1;
+    return GetScriptForStructuredData(CLASS_Staking) << STAKE_PoolFee
+                    << nPoolFeeVersion
+                    << ToByteVector(data.poolAddr)
+                    << data.isScriptHash
+                    << data.poolFee;
+}
+
 CScript GetScriptForVoteDecl(const VoteData& data)
 {
     int nVoteVersion = 1;

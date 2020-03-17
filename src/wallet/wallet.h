@@ -1157,7 +1157,7 @@ public:
        - ticketAddress: Override the ticket address to which voting rights are given
        - numTickets: The number of tickets to purchase
        - poolAddress: The address to pay stake pool fees to
-       - poolFee: The amount of fees to pay to the stake pool
+       - poolFeePercent: The percent from the voter subsidy to pay to the stake pool
        - expiry: Height at which the purchase tickets expire
        - ticketFeeIncrement: The transaction fee rate (PAI/kB) to use (overrides fees set by the wallet config or settxfee RPC) (optional)
        In case of success, the returned vector contains the transactions hex.
@@ -1169,7 +1169,7 @@ public:
                    std::string ticketAddress,
                    int numTickets,
                    std::string poolAddress,
-                   double poolFee,
+                   double poolFeePercent,
                    int64_t expiry,
                    CAmount ticketFeeIncrement);
 
