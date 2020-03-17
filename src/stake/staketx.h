@@ -43,7 +43,7 @@ struct TicketContribData {
 struct PoolFeeData {
     int nVersion;
     uint160 poolAddr;
-    bool isScriptHash;  // TODO is there a better way to represent this?
+    int isScriptHash;  // TODO is there a better way to represent this?
     CAmount poolFee;
 };
 

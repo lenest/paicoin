@@ -1659,7 +1659,7 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
             mTicketTx.vout.push_back(CTxOut(change, changeScript));
 
             if (IsValidDestination(poolAddr)) {
-                bool isScriptHash = poolAddr.which() == 2;
+                int isScriptHash = (poolAddr.which() == 2) ? 1 : 0;
                 PoolFeeData poolFeeData = { 1, isScriptHash ? boost::get<CScriptID>(poolAddr) : boost::get<CKeyID>(poolAddr), isScriptHash, 0 };
                 CScript poolFeeScript = GetScriptForPoolFee(poolFeeData);
                 mTicketTx.vout.push_back(CTxOut(0, poolFeeScript));
@@ -1687,7 +1687,7 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
 
             // replace the pool fee output
             if (IsValidDestination(poolAddr)) {
-                bool isScriptHash = poolAddr.which() == 2;
+                int isScriptHash = (poolAddr.which() == 2) ? 1 : 0;
                 CAmount poolFee = StakePoolTicketFee(ticketPrice, ticketFee, chainActive.Height(), poolFeePercent);
                 PoolFeeData poolFeeData = { 1, isScriptHash ? boost::get<CScriptID>(poolAddr) : boost::get<CKeyID>(poolAddr), isScriptHash, poolFee };
                 CScript poolFeeScript = GetScriptForPoolFee(poolFeeData);
