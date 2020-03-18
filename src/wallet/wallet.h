@@ -791,7 +791,7 @@ public:
     // Create wallet with dummy database handle
     CWallet() :
         dbw(new CWalletDBWrapper()),
-        ticketFeeIncrement(minTxFee)
+        ticketFeeRate(minTxFee)
     {
         ticketBuyer = MakeUnique<CTicketBuyer>(this);
         SetNull();
@@ -800,7 +800,7 @@ public:
     // Create wallet with passed-in database handle
     explicit CWallet(std::unique_ptr<CWalletDBWrapper> dbw_in) :
         dbw(std::move(dbw_in)),
-        ticketFeeIncrement(minTxFee)
+        ticketFeeRate(minTxFee)
     {
         ticketBuyer = MakeUnique<CTicketBuyer>(this);
         SetNull();
@@ -997,7 +997,7 @@ public:
     static CFeeRate m_discard_rate;
 
     // wallet's ticket fee rate
-    CFeeRate ticketFeeIncrement;
+    CFeeRate ticketFeeRate;
 
     bool NewKeyPool();
     size_t KeypoolCountExternalKeys();
@@ -1149,6 +1149,23 @@ public:
        this function). */
     bool SetHDMasterKey(const CPubKey& key);
 
+    /* Creates a transaction that is gathering sparse funds from the wallet in order to
+       provide unique UTXOs to all the tickets being purchased in one transaction.
+       The resulting transaction is not sent to the mempool.
+       - fromAccount: The account to use for funding
+       - neededPerTicket: The amount needed for each ticket
+       - vspFee: The VSP fee (optional, default =  0)
+       - numTickets: The number of tickets to purchase (optional, default = 1)
+       - feeRate: The transaction fee rate (PAI/kB) to use (overrides current fees if larger than them) (optional, default = -1)
+       In case of success, the returned int is not zero and contains the transaction hash.
+       In case of error, the returned vector is empty. Check the error object for the reason. */
+    const uint256
+    CreateTicketPurchaseFunding(std::string fromAccount,
+                                CAmount neededPerTicket,
+                                CAmount vspFee = 0,
+                                int numTickets = 1,
+                                CAmount feeRate = -1);
+
     /* Initiates the purchase of tickets
        It funds and creates the corresponding transactions, as well as it sends them to the memory pool.
        - fromAccount: The account to use for purchase
@@ -1159,7 +1176,7 @@ public:
        - poolAddress: The address to pay stake pool fees to
        - poolFeePercent: The percent from the voter subsidy to pay to the stake pool
        - expiry: Height at which the purchase tickets expire
-       - ticketFeeIncrement: The transaction fee rate (PAI/kB) to use (overrides fees set by the wallet config or settxfee RPC) (optional)
+       - feeRate: The transaction fee rate (PAI/kB) to use (overrides current fees if larger than them) (optional, default = -1)
        In case of success, the returned vector contains the transactions hex.
        In case of error, the returned vector is empty. Check the error object for the reason. */
     std::pair<std::vector<std::string>, CWalletError>
@@ -1171,7 +1188,7 @@ public:
                    std::string poolAddress,
                    double poolFeePercent,
                    int64_t expiry,
-                   CAmount ticketFeeIncrement);
+                   CAmount feeRate = -1);
 
      /* Returns the ticket buyer */
      CTicketBuyer* GetTicketBuyer() { return ticketBuyer.get(); }

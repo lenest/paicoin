@@ -123,6 +123,13 @@ bool ValidateBuyTicketStructure(const CTransaction& tx, std::string& reason);
 bool ValidateVoteStructure(const CTransaction& tx, std::string& reason);
 bool ValidateRevokeTicketStructure(const CTransaction& tx, std::string& reason);
 
+size_t GetEstimatedP2PKHTxInSize(bool compressed = true);
+size_t GetEstimatedP2PKHTxOutSize();
+size_t GetEstimatedBuyTicketDeclTxOutSize();
+size_t GetEstimatedTicketContribTxOutSize();
+size_t GetEstimatedPoolFeeTxOutSize();
+size_t GetEstimatedSizeOfBuyTicketTx(bool useVsp);
+
 // ==============================
 
 // StakeSlice is a helper class that makes it easier to traverse stake transactions of a block.

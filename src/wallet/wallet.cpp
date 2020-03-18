@@ -1442,7 +1442,133 @@ bool CWallet::IsHDEnabled() const
     return !hdChain.masterKeyID.IsNull();
 }
 
-std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::string fromAccount, CAmount spendLimit, int minConf, std::string ticketAddress, int numTickets, std::string poolAddress, double poolFeePercent, int64_t expiry, CAmount ticketFeeIncrement)
+const uint256 CWallet::CreateTicketPurchaseFunding(std::string fromAccount, CAmount neededPerTicket, CAmount vspFee, int numTickets, CAmount feeRate)
+{
+    if (!MoneyRange(neededPerTicket))
+        return uint256();
+
+    if (neededPerTicket * numTickets > GetBalance())
+        return uint256();
+
+    if (vspFee < 0)
+        vspFee = 0;
+
+    if (!MoneyRange(vspFee) || vspFee >= neededPerTicket)
+        return uint256();
+
+    if (numTickets <= 0)
+        return uint256();
+
+    CFeeRate txFeeRate{feeRate};
+    if (feeRate <= 0) {
+        txFeeRate = this->ticketFeeRate;
+    }
+
+    if (GetBroadcastTransactions() && !g_connman)
+        return uint256();
+
+    // if the VSP is used, reserve the fee from each ticket value,
+    // and create an additional output dedicated to the VSP fee for each ticket
+
+    CAmount userAmount = neededPerTicket - vspFee;
+
+    LOCK2(cs_main, cs_wallet);
+
+    CTxDestination addr;
+    CPubKey pubKey;
+
+    if (! GetKeyFromPool(pubKey, false))
+        return uint256();
+
+    addr = pubKey.GetID();
+
+    if (!IsValidDestination(addr))
+        return uint256();
+
+    CScript script = GetScriptForDestination(addr);
+
+    CMutableTransaction mTx;
+
+    CAmount fee = 0;
+
+    // enter a loop that aims to collect the necessary funding to include:
+    // all outputs for the tickets, a transaction fee calculated using the specified fee rate and
+    // the optional change.
+    // If the inputs do not cover the fee, add this fee to the first output and
+    // try again. If succesful, restore the first output, calculate the correct changed and
+    // commit the transaction. If failed, retry until successful, or not enough funds.
+
+    bool needsRefunding = true;
+    while (needsRefunding) {
+        CAmount nFeeRet;
+        auto strFailReason = std::string{};
+
+        mTx.vout.clear();
+
+        if (vspFee > 0)
+            mTx.vout.push_back(CTxOut(vspFee, script));
+
+        mTx.vout.push_back(CTxOut(userAmount + fee, script));
+
+        for (int i = 1; i < numTickets; ++i) {
+            if (vspFee > 0)
+                mTx.vout.push_back(CTxOut(vspFee, script));
+
+            mTx.vout.push_back(CTxOut(userAmount, script));
+        }
+
+        // normally, the change output position is randomized,
+        // but in this case, since the other outputs are identical,
+        // there is no real anonymization from this randomization.
+        // Therefore, the change position is precomputed here
+        // at the end of the transaction output list
+        int nChangePosInOut = static_cast<int>(mTx.vout.size());
+
+        if (!FundTransaction(mTx, nFeeRet, nChangePosInOut, strFailReason, false, {}, CCoinControl{}))
+            return uint256();
+
+        // change output position must not change
+        assert(nChangePosInOut == static_cast<int>(mTx.vout.size()-1));
+
+        if (!SignTransaction(mTx))
+            return uint256();
+
+        fee = txFeeRate.GetFee(GetSerializeSize(mTx, SER_NETWORK, PROTOCOL_VERSION));
+
+        if (fee > nFeeRet) {
+            if (nChangePosInOut > 0) {
+                if (fee < mTx.vout[nChangePosInOut].nValue + nFeeRet) {
+                    mTx.vout[nChangePosInOut].nValue -= fee - nFeeRet;
+                    if (!SignTransaction(mTx))
+                        return uint256();
+                    needsRefunding = false;
+                }
+            }
+
+        } else {
+            needsRefunding = false;
+        }
+    }
+
+    // restore the first output value
+    mTx.vout[(vspFee > 0) ? 1 : 0].nValue = userAmount;
+
+    if (!SignTransaction(mTx))
+        return uint256();
+
+    CValidationState state;
+    CWalletTx wtx;
+    wtx.fTimeReceivedIsTxTime = true;
+    wtx.BindWallet(this);
+    wtx.SetTx(MakeTransactionRef(std::move(mTx)));
+    CReserveKey reservekey{this};
+    if (!CommitTransaction(wtx, reservekey, g_connman.get(), state))
+        return uint256();
+
+    return wtx.GetHash();
+}
+
+std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::string fromAccount, CAmount spendLimit, int minConf, std::string ticketAddress, int numTickets, std::string poolAddress, double poolFeePercent, int64_t expiry, CAmount feeRate)
 {
     std::vector<std::string> results;
     CWalletError error;
@@ -1527,9 +1653,9 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
     // seems to always be the case while the address is valid
 
     // TODO Make sure this is handled correctly
-    CFeeRate ticketFeeRate{ticketFeeIncrement};
-    if (ticketFeeIncrement == 0) {
-        ticketFeeRate = this->ticketFeeIncrement;
+    CFeeRate fr{feeRate};
+    if (feeRate <= 0) {
+        fr = ticketFeeRate;
     }
 
     // create the scripts that define the transaction outputs
@@ -1562,7 +1688,7 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
             + GetSerializeSize(dummyContributorInfoTxOut, SER_NETWORK, PROTOCOL_VERSION)
             + GetSerializeSize(dummyChangeTxOut, SER_NETWORK, PROTOCOL_VERSION)
             + (IsValidDestination(poolAddr) ? GetSerializeSize(dummyPoolFeeTxOut, SER_NETWORK, PROTOCOL_VERSION) : 0);
-    CAmount estimatedMinTicketFee{ticketFeeRate.GetFee(estimatedMinSize)};
+    CAmount estimatedMinTicketFee{fr.GetFee(estimatedMinSize)};
     CAmount ticketFee{estimatedMinTicketFee};
 
     CAmount neededPerTicket = ticketPrice + estimatedMinTicketFee;
@@ -1672,7 +1798,7 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
             // Also, use the highest of the fees:
             // if the ticket fee is larger use that,
             // otherwise, use the normal transaction fee.
-            ticketFee = ticketFeeRate.GetFee(GetSerializeSize(mTicketTx, SER_NETWORK, PROTOCOL_VERSION));
+            ticketFee = fr.GetFee(GetSerializeSize(mTicketTx, SER_NETWORK, PROTOCOL_VERSION));
             if (ticketFee < mTicketTx.vout[ticketChangeOutputIndex].nValue) {
                 if (ticketFee < nFeeRet)
                     ticketFee = nFeeRet;

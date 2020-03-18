@@ -2,6 +2,7 @@
 #include "stake/staketx.h"
 #include "script/standard.h"
 #include "chain.h"
+#include "pubkey.h"
 
 #include <sstream>
 
@@ -440,6 +441,72 @@ bool ValidateRevokeTicketStructure(const CTransaction &tx, std::string& reason)
     }
 
     return true;
+}
+
+size_t GetEstimatedP2PKHTxInSize(bool compressed)
+{
+    // a P2PKH input has the following structure:
+    // - previous outpoint hash     [32 bytes]
+    // - previous outpoint index    [4 bytes]
+    // - scriptsig size             [1 byte]
+    // - push opcode                [1 byte]
+    // - signature                  [71 or 72 bytes]
+    // - push opcode                [1 byte]
+    // - public key                 [33 bytes compressed, 65 bytes uncompressed]
+    // - sequence                   [4 bytes]
+
+    return 32 + 4 + 1 + 1 + 72 + 1 + (compressed ? 33 : 65) + 4;
+}
+
+size_t GetEstimatedP2PKHTxOutSize()
+{
+    // a P2PKH output has the following structure:
+    // - value              [8 bytes]
+    // - script size        [1 byte]
+    // - OP_DUP             [1 byte]
+    // - OP_HASH160         [1 byte]
+    // - push opcode        [1 byte]
+    // - public key hash    [20 bytes]
+    // - OP_EQUALVERIFY     [1 byte]
+    // - OP_CHECKSIG        [1 byte]
+
+    return 8 + 1 + 1 + 1 + 1 + 20 + 1 + 1;
+}
+
+size_t GetEstimatedBuyTicketDeclTxOutSize()
+{
+    BuyTicketData data{1};
+    CTxOut txOut{0, GetScriptForBuyTicketDecl(data)};
+    return GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION);
+}
+
+size_t GetEstimatedTicketContribTxOutSize()
+{
+    TicketContribData data{1, CKeyID(), 0};
+    CTxOut txOut{0, GetScriptForTicketContrib(data)};
+    return GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION);
+}
+
+size_t GetEstimatedPoolFeeTxOutSize()
+{
+    PoolFeeData data{1, CKeyID(), 0, 0};
+    CTxOut txOut{0, GetScriptForPoolFee(data)};
+    return GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION);
+}
+
+size_t GetEstimatedSizeOfBuyTicketTx(bool useVsp)
+{
+    // since the format of the ticket purchase transaction is fixed,
+    // its size can be estimated precisely.
+    // A ticket purchase transaction has the structure described in ValidateBuyTicketStructure().
+
+    return (useVsp ? GetEstimatedP2PKHTxInSize() : 0)
+            + GetEstimatedP2PKHTxInSize()
+            + GetEstimatedBuyTicketDeclTxOutSize()
+            + GetEstimatedP2PKHTxOutSize()
+            + GetEstimatedTicketContribTxOutSize()
+            + GetEstimatedP2PKHTxOutSize()
+            + (useVsp ? GetEstimatedPoolFeeTxOutSize() : 0);
 }
 
 StakeSlice::StakeSlice(std::vector<CTransactionRef> vtx)
