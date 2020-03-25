@@ -52,7 +52,8 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
         // TODO: serialization of stake fields to activate when Hybrid PoW/PoS deploys
-//        READWRITE(nStakeDifficulty);
+        // if (nStakeDifficulty > 0)
+            // READWRITE(nStakeDifficulty);
 //        READWRITE(nVoteBits);
 //        READWRITE(nTicketPoolSize);
 //        READWRITE(ticketLotteryState);

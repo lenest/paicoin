@@ -260,7 +260,7 @@ public:
         consensus.nTicketsPerBlock             = 5;
         consensus.nTicketMaturity              = 256;
         consensus.nTicketExpiry                = 5 * consensus.nTicketPoolSize;
-        consensus.nCoinbaseMaturity            = 256;
+        // consensus.nCoinbaseMaturity            = 256;
         consensus.nSStxChangeMaturity          = 1;
         consensus.nTicketPoolSizeWeight        = 4;
         consensus.nStakeDiffAlpha              = 1;
@@ -268,7 +268,7 @@ public:
         consensus.nStakeDiffWindows            = 20;
         consensus.nStakeVersionInterval        = 144 * 2 * 7; // ~2 weeks
         consensus.nMaxFreshStakePerBlock       = 4 * consensus.nTicketsPerBlock;
-        consensus.nStakeEnabledHeight          = consensus.nCoinbaseMaturity + consensus.nTicketMaturity;
+        consensus.nStakeEnabledHeight          = 356;         //consensus.nCoinbaseMaturity + consensus.nTicketMaturity;
         consensus.nStakeValidationHeight       = 4096;        // ~ 14 days
         consensus.stakeBaseSigScript           = CScript() << 0x00 << 0x00;
         consensus.nStakeMajorityMultiplier     = 3;
@@ -418,7 +418,7 @@ public:
         consensus.nTicketsPerBlock             = 5;
         consensus.nTicketMaturity              = 16;
         consensus.nTicketExpiry                = 6 * consensus.nTicketPoolSize;
-        consensus.nCoinbaseMaturity            = 16;
+        // consensus.nCoinbaseMaturity            = 16;
         consensus.nSStxChangeMaturity          = 1;
         consensus.nTicketPoolSizeWeight        = 4;
         consensus.nStakeDiffAlpha              = 1;
@@ -426,8 +426,8 @@ public:
         consensus.nStakeDiffWindows            = 20;
         consensus.nStakeVersionInterval        = 144 * 2 * 7; // ~2 weeks
         consensus.nMaxFreshStakePerBlock       = 4 * consensus.nTicketsPerBlock;
-        consensus.nStakeEnabledHeight          = consensus.nCoinbaseMaturity + consensus.nTicketMaturity;
-        consensus.nStakeValidationHeight       = 768;//100000;      // Arbitrary chosen into the future; height is 46261 at the moment
+        consensus.nStakeEnabledHeight          = 116;         // consensus.nCoinbaseMaturity + consensus.nTicketMaturity;
+        consensus.nStakeValidationHeight       = 768;         // Arbitrary chosen into the future; height is 46261 at the moment
         consensus.stakeBaseSigScript           = CScript() << 0x00 << 0x00;
         consensus.nStakeMajorityMultiplier     = 3;
         consensus.nStakeMajorityDivisor        = 4;
@@ -555,12 +555,12 @@ public:
             0
         };
 
-        consensus.nMinimumStakeDiff            = 0;//20000;
+        consensus.nMinimumStakeDiff            = 20000;
         consensus.nTicketPoolSize              = 64;
         consensus.nTicketsPerBlock             = 5;
         consensus.nTicketMaturity              = 8;
         consensus.nTicketExpiry                = 5 * consensus.nTicketPoolSize;
-        consensus.nCoinbaseMaturity            = 16;
+        // consensus.nCoinbaseMaturity            = 16;
         consensus.nSStxChangeMaturity          = 1;
         consensus.nTicketPoolSizeWeight        = 4;
         consensus.nStakeDiffAlpha              = 1;

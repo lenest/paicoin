@@ -98,7 +98,8 @@ struct Params {
     uint32_t nTicketExpiry;
     // CoinbaseMaturity is the number of blocks required before newly mined
     // coins (coinbase transactions) can be spent.
-    uint16_t nCoinbaseMaturity;
+    // uint16_t nCoinbaseMaturity; We have a constant for this purpose in consensus.h, COINBASE_MATURITY
+
     // Maturity for spending SStx change outputs.
     uint16_t nSStxChangeMaturity;
     // TicketPoolSizeWeight is the multiplicative weight applied to the

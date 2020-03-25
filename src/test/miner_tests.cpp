@@ -963,7 +963,7 @@ BOOST_FIXTURE_TEST_CASE( CreateNewBlock_stake_REGTEST, TestChain100Setup_p2pkh)
     const CChainParams& chainparams = Params();
     const auto& stakeEnabledHeight = chainparams.GetConsensus().nStakeEnabledHeight;
     const auto& stakeValidationHeight = chainparams.GetConsensus().nStakeValidationHeight;
-    const auto& minimumStakeDiff = chainparams.GetConsensus().nMinimumStakeDiff + 2e4;
+    const auto& minimumStakeDiff = chainparams.GetConsensus().nMinimumStakeDiff;
     const auto& ticketExpiry = chainparams.GetConsensus().nTicketExpiry;
     const auto& maxFreshTicketsPerBlock = chainparams.GetConsensus().nMaxFreshStakePerBlock;
 
@@ -1041,17 +1041,26 @@ BOOST_FIXTURE_TEST_CASE( CreateNewBlock_stake_REGTEST, TestChain100Setup_p2pkh)
 
     // amount added to the current ticketPrice
     const auto& test_ticket_contributions = std::vector<CAmount>{
-        1000LL,
-        1100LL,
-        100LL,
+        10LL,
+        11LL,
+        10LL,
         20LL,
-        200LL,
+        20LL,
         0LL,
+        1LL,
+        2LL,
+        3LL,
+        4LL,
         10LL,
         30LL,
-        1001LL,
-        1101LL,
-        101LL,
+        11LL,
+        11LL,
+        11LL,
+        11LL,
+        21LL,
+        31LL,
+        41LL,
+        51LL,
     }; 
 
     BOOST_CHECK_LE(test_ticket_contributions.size(), maxFreshTicketsPerBlock);
@@ -1091,7 +1100,8 @@ BOOST_FIXTURE_TEST_CASE( CreateNewBlock_stake_REGTEST, TestChain100Setup_p2pkh)
     };
 
     while (chainActive.Tip()->nHeight < stakeEnabledHeight) {
-        const auto nTickets = BuyTestTickets(minimumStakeDiff, test_ticket_contributions);
+        const auto& ticketPrice = CalculateNextRequiredStakeDifficulty(chainActive.Tip(),Params().GetConsensus());
+        const auto nTickets = BuyTestTickets(ticketPrice, test_ticket_contributions);
         BOOST_CHECK_EQUAL(nTickets, test_ticket_contributions.size());
         // actually add the block containing tickets as tip
         const auto& blockWithTickets = ProcessTemplateBlock(pblocktemplate->block);
@@ -1108,8 +1118,9 @@ BOOST_FIXTURE_TEST_CASE( CreateNewBlock_stake_REGTEST, TestChain100Setup_p2pkh)
 
     while (chainActive.Tip()->nHeight <  stakeValidationHeight - 1) {
         // continue purchasing tickets until coinbase txs have been spend
-        const auto nTickets = BuyTestTickets(minimumStakeDiff, test_ticket_contributions);
-        BOOST_CHECK_EQUAL(nTickets, test_ticket_contributions.size());
+        const auto& ticketPrice = CalculateNextRequiredStakeDifficulty(chainActive.Tip(),Params().GetConsensus());
+        const auto nTickets = BuyTestTickets(ticketPrice, test_ticket_contributions);
+        BOOST_CHECK_LE(nTickets, test_ticket_contributions.size());
         const auto& blockWithTickets = ProcessTemplateBlock(pblocktemplate->block);
         BOOST_CHECK(chainActive.Tip()->GetBlockHash() == blockWithTickets.GetHash());
         coinbaseTxns.push_back(*blockWithTickets.vtx[0]);
@@ -1117,12 +1128,13 @@ BOOST_FIXTURE_TEST_CASE( CreateNewBlock_stake_REGTEST, TestChain100Setup_p2pkh)
     }
 
     BOOST_CHECK_EQUAL(chainActive.Tip()->nHeight, stakeValidationHeight - 1);
-    BOOST_CHECK_EQUAL(chainActive.Tip()->pstakeNode->LiveTickets().size(), numberLiveTickets);
+    BOOST_CHECK_GT(chainActive.Tip()->pstakeNode->LiveTickets().size(), numberLiveTickets);
+    numberLiveTickets = chainActive.Tip()->pstakeNode->LiveTickets().size();
 
-    // NOTE: using the current chainparams seems not feasible to purchase tickets after nStakeValidationHeight
-    // - ticket price is increased to 1*COIN and coinbase values has halved 9 times
+    // NOTE: we can only purchase a limited number of tickets after nStakeValidationHeight using the current chainparams 
+    // - ticket price is increased and coinbase values has halved 9 times
     // - in these conditions all matured spendable outputs summed up are not enough for one ticket
-    // - we rely on buying the max amount of ticket before this height at the lower price
+    // - we rely on buying the max amount of tickets before this height at the lower price
 
     {
         const auto& blockHeightToVoteOn = chainActive.Tip()->nHeight;
@@ -1154,7 +1166,7 @@ BOOST_FIXTURE_TEST_CASE( CreateNewBlock_stake_REGTEST, TestChain100Setup_p2pkh)
         SignTx(txBadVote2, voteStakeInputIndex, scriptPubKeyStake, stakeKey);
         mempool.addUnchecked(txBadVote2.GetHash(), entry.Fee(ZEROFEE).FromTx(txBadVote2));
 
-        const auto& ticketPrice = 1* COIN; // difficulty increased since we are at stakeValidationHeight
+        const auto& ticketPrice = CalculateNextRequiredStakeDifficulty(chainActive.Tip(),Params().GetConsensus());
         const auto nTickets = BuyTestTickets(ticketPrice, test_ticket_contributions);
         BOOST_CHECK_EQUAL(nTickets, 0); // see NOTE
         // actually add the block using valid votes as tip
@@ -1163,7 +1175,7 @@ BOOST_FIXTURE_TEST_CASE( CreateNewBlock_stake_REGTEST, TestChain100Setup_p2pkh)
         coinbaseTxns.push_back(*blockWithVotes.vtx[0]);
     }
 
-    numberLiveTickets += test_ticket_contributions.size()/*last number of matured*/ - 5/*used as winners in last block*/;
+    numberLiveTickets -= 5/*used as winners in last block*/;
     BOOST_CHECK_EQUAL(chainActive.Tip()->pstakeNode->LiveTickets().size(), numberLiveTickets);
 
     const auto& heightExpiredBecomeMissed = (int)(ticketExpiry) + stakeEnabledHeight;
@@ -1205,8 +1217,7 @@ BOOST_FIXTURE_TEST_CASE( CreateNewBlock_stake_REGTEST, TestChain100Setup_p2pkh)
             mempool.addUnchecked(txRevokeTicket.GetHash(), entry.Fee(ZEROFEE).SpendsCoinbase(true).FromTx(txRevokeTicket));
         }
 
-        // difficulty increased since we are above stakeValidationHeight
-        const auto& ticketPrice = 1*COIN;
+        const auto& ticketPrice = CalculateNextRequiredStakeDifficulty(chainActive.Tip(),Params().GetConsensus());
         const auto nTickets = BuyTestTickets(ticketPrice, test_ticket_contributions);
         BOOST_CHECK_EQUAL(nTickets, 0); // see NOTE
 
@@ -1299,7 +1310,7 @@ BOOST_FIXTURE_TEST_CASE( FakeChainGenerator_stake_REGTEST, Generator)
         const auto& spend = OldestCoinOuts();
         const auto& ticketPrice = NextRequiredStakeDifficulty();
         const auto& ticketFee = CAmount(2);
-        assert(spend.front().amount >= ConsensusParams().nMaxFreshStakePerBlock * (ticketPrice + ticketFee));
+        // assert(spend.front().amount >= ConsensusParams().nMaxFreshStakePerBlock * (ticketPrice + ticketFee));
 
         auto purchaseTx =  CreateTicketPurchaseTx(spend.front(), ticketPrice, ticketFee);
         b.vtx.push_back(MakeTransactionRef(purchaseTx));

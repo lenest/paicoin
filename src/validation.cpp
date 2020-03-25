@@ -3173,15 +3173,6 @@ bool CheckProofOfStake(const CBlock& block, int64_t posLimit)
     return true;
 }
 
-CAmount calcNextRequiredStakeDifficulty(const CBlock& block, const CBlockIndex *pindexPrev, const CChainParams& params)
-{
-    int blockHeight = pindexPrev->nHeight + 1;
-    if (blockHeight >= params.GetConsensus().nStakeValidationHeight)
-        return 1 * COIN;
-    else
-        return params.GetConsensus().nMinimumStakeDiff;
-}
-
 static bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, const Consensus::Params& consensusParams, int nBlockHeight, bool fCheckPOW = true)
 {
     // Check proof of work matches claimed amount
@@ -3467,11 +3458,13 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationSta
 
     // Ensure the stake difficulty specified in the block header matches the calculated difficulty based on the previous block
     // and difficulty retarget rules.
-    CAmount expectedStakeDifficulty = CalculateNextRequiredStakeDifficulty(pindexPrev, params.GetConsensus());
-    if (block.nStakeDifficulty != expectedStakeDifficulty) {
-        auto report = strprintf("incorrect stake difficulty in a block: expected %.2f, found %.2f", expectedStakeDifficulty / (float)COIN, block.nStakeDifficulty / (float)COIN);
-        return state.DoS(100, false, REJECT_INVALID, "bad-stakediff", false, report);
-    }
+    // if (pindexPrev->nHeight > 0) {
+    // CAmount expectedStakeDifficulty = CalculateNextRequiredStakeDifficulty(pindexPrev, params.GetConsensus());
+    // if (block.nStakeDifficulty != expectedStakeDifficulty) {
+    //     auto report = strprintf("incorrect stake difficulty in a block: expected %.2f, found %.2f", expectedStakeDifficulty / (float)COIN, block.nStakeDifficulty / (float)COIN);
+    //     return state.DoS(100, false, REJECT_INVALID, "bad-stakediff", false, report);
+    // }
+    // }
 
     auto expectedStakeVersion = calcStakeVersion(pindexPrev, params.GetConsensus());
     if (block.nStakeVersion != expectedStakeVersion) {
