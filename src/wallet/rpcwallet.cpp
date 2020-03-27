@@ -27,6 +27,7 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #include "wallet/fees.h"
+#include "pow.h"
 
 #include <init.h>  // For StartShutdown
 
@@ -3735,7 +3736,12 @@ UniValue generatevote(const JSONRPCRequest& request)
     const auto& ticketPriceAtPurchase = ticketTxPtr->vout[ticketStakeOutputIndex].nValue;
     for ( const auto& contrib : contributions){
         const auto& reward = CalcContributorRemuneration( contrib.contributedAmount, ticketPriceAtPurchase, subsidy, contributionSum);
-        CScript rewardScript = GetScriptForDestination(contrib.rewardAddr);
+        CScript rewardScript;
+        if (contrib.whichAddr == 1) {
+            rewardScript = GetScriptForDestination(CKeyID(contrib.rewardAddr));
+        } else {
+            rewardScript = GetScriptForDestination(CScriptID(contrib.rewardAddr));
+        }
         mVoteTx.vout.push_back(CTxOut(reward, rewardScript));
     }
 

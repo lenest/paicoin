@@ -283,7 +283,6 @@ bool GetTransaction(const uint256 &hash, CTransactionRef &tx, const Consensus::P
 CTransactionRef GetTicket(const uint256 &ticketTxHash);
 /** Find the best known block, and make it the tip of the block chain */
 bool ActivateBestChain(CValidationState& state, const CChainParams& chainparams, std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
-CAmount GetTotalBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
 CAmount GetMinerSubsidy(int nHeight, const Consensus::Params& consensusParams);
 CAmount GetVoterSubsidy(int nHeight, const Consensus::Params& consensusParams);
 CAmount CalcContributorRemuneration(CAmount contributedAmount, CAmount totalStake, CAmount subsidy, CAmount contributionSum);
@@ -503,9 +502,5 @@ std::shared_ptr<StakeNode> FetchStakeNode(CBlockIndex* pindex, const Consensus::
 /** Check existence of address in the address index */
 bool AddressExistsInIndex(const std::string& address);
 
-/** 
- * Get the next stake difficulty
-*/
-CAmount calcNextRequiredStakeDifficulty(const CBlock& block, const CBlockIndex *pindexPrev, const CChainParams& params);
 
 #endif // PAICOIN_VALIDATION_H

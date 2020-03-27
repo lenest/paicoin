@@ -33,7 +33,8 @@ public:
     uint32_t nVoteBits;
     uint32_t nTicketPoolSize;
     uint48  ticketLotteryState;
-
+    uint8_t nFreshStake;
+    uint32_t nStakeVersion;
 
     CBlockHeader()
     {
@@ -50,6 +51,12 @@ public:
         READWRITE(nTime);
         READWRITE(nBits);
         READWRITE(nNonce);
+        // TODO: serialization of stake fields to activate when Hybrid PoW/PoS deploys
+//        READWRITE(nStakeDifficulty);
+//        READWRITE(nVoteBits);
+//        READWRITE(nTicketPoolSize);
+//        READWRITE(ticketLotteryState);
+//        READWRITE(nStakeVersion);
     }
 
     void SetNull()
@@ -64,6 +71,8 @@ public:
         nVoteBits = 1;
         nTicketPoolSize = 0;
         std::fill(ticketLotteryState.begin(), ticketLotteryState.end(), 0);
+        nFreshStake = 0;
+        nStakeVersion = 0;
     }
 
     bool IsNull() const
@@ -128,6 +137,8 @@ public:
         block.nStakeDifficulty = nStakeDifficulty;
         block.nTicketPoolSize = nTicketPoolSize;
         block.ticketLotteryState = ticketLotteryState;
+        block.nFreshStake    = nFreshStake;
+        block.nStakeVersion  = nStakeVersion;
         return block;
     }
 
