@@ -108,16 +108,6 @@ CScript GetScriptForTicketContrib(const TicketContribData& data)
                     << ToByteVector(data.rewardAddr) << data.contributedAmount;
 }
 
-CScript GetScriptForPoolFee(const PoolFeeData& data)
-{
-    int nPoolFeeVersion = 1;
-    return GetScriptForStructuredData(CLASS_Staking) << STAKE_PoolFee
-                    << nPoolFeeVersion
-                    << ToByteVector(data.poolAddr)
-                    << data.isScriptHash
-                    << data.poolFee;
-}
-
 CScript GetScriptForVoteDecl(const VoteData& data)
 {
     int nVoteVersion = 1;
@@ -192,24 +182,6 @@ bool ParseTicketContrib(const CTransaction& tx, uint32_t txoutIndex, TicketContr
     data.rewardAddr = uint160(items[contribAddrIndex]);
     data.contributedAmount = CScriptNum(items[contribAmountIndex], false).getint(); // CScriptNum can handle 32-byte integers; is that enough?
     //data.contributedAmount = base_blob<64>(items[contribAmountIndex]).GetUint64(0); // this parses uint64 but not int64
-    return true;
-}
-
-bool ParsePoolFee(const CTransaction& tx, uint32_t txoutIndex, PoolFeeData& data)
-{
-    int numItems = 7;   // structVersion, dataClass, stakeDataClass, poolFeeVersion, poolAddr, isScriptHash, poolFee
-    std::vector<std::vector<unsigned char> > items;
-    if (!ParseStakeData(tx, txoutIndex, STAKE_PoolFee, numItems, items))
-        return false;
-
-    data.nVersion = CScriptNum(items[poolVersionIndex], false).getint();
-    if (data.nVersion != 1)
-        return false;
-
-    data.poolAddr = uint160(items[poolAddrIndex]);
-    data.isScriptHash = CScriptNum(items[poolIsScriptHashIndex], false).getint();
-    data.poolFee = CScriptNum(items[poolFeeIndex], false).getint(); // CScriptNum can handle 32-byte integers; is that enough?
-    //data.poolFee = base_blob<64>(items[poolFeeIndex]).GetUint64(0); // this parses uint64 but not int64
     return true;
 }
 
@@ -487,26 +459,25 @@ size_t GetEstimatedTicketContribTxOutSize()
     return GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION);
 }
 
-size_t GetEstimatedPoolFeeTxOutSize()
-{
-    PoolFeeData data{1, CKeyID(), 0, 0};
-    CTxOut txOut{0, GetScriptForPoolFee(data)};
-    return GetSerializeSize(txOut, SER_NETWORK, PROTOCOL_VERSION);
-}
-
 size_t GetEstimatedSizeOfBuyTicketTx(bool useVsp)
 {
     // since the format of the ticket purchase transaction is fixed,
     // its size can be estimated precisely.
     // A ticket purchase transaction has the structure described in ValidateBuyTicketStructure().
+    // version + in count (1|2) + 1 regular input + out count (4|5) + buy ticket decl output + ticket address output + pool fee contributor (optional)  + pool fee change output (optional) + contributor info output + change output + locktime
 
-    return (useVsp ? GetEstimatedP2PKHTxInSize() : 0)
+    return 4
+            + 1
+            + (useVsp ? GetEstimatedP2PKHTxInSize() : 0)
             + GetEstimatedP2PKHTxInSize()
+            + 1
             + GetEstimatedBuyTicketDeclTxOutSize()
             + GetEstimatedP2PKHTxOutSize()
+            + (useVsp ? GetEstimatedTicketContribTxOutSize() : 0)
+            + (useVsp ? GetEstimatedP2PKHTxOutSize() : 0)
             + GetEstimatedTicketContribTxOutSize()
             + GetEstimatedP2PKHTxOutSize()
-            + (useVsp ? GetEstimatedPoolFeeTxOutSize() : 0);
+            + 4;
 }
 
 StakeSlice::StakeSlice(std::vector<CTransactionRef> vtx)

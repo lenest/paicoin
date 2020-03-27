@@ -1150,17 +1150,16 @@ public:
     bool SetHDMasterKey(const CPubKey& key);
 
     /* Creates a transaction that is gathering sparse funds from the wallet in order to
-       provide unique UTXOs to all the tickets being purchased in one transaction.
-       The resulting transaction is not sent to the mempool.
+       provide unique UTXOs to all the tickets being purchased in one batch.
        - fromAccount: The account to use for funding
        - neededPerTicket: The amount needed for each ticket
        - vspFee: The VSP fee (optional, default =  0)
        - numTickets: The number of tickets to purchase (optional, default = 1)
        - feeRate: The transaction fee rate (PAI/kB) to use (overrides current fees if larger than them) (optional, default = -1)
-       In case of success, the returned int is not zero and contains the transaction hash.
-       In case of error, the returned vector is empty. Check the error object for the reason. */
-    const uint256
-    CreateTicketPurchaseFunding(std::string fromAccount,
+       In case of success, the wallet transaction is returned.
+       In case of error, the wallet transaction is not valid. Check the error object for the reason. */
+    std::pair<const CWalletTx&, CWalletError>
+    CreateTicketPurchaseSplitTx(std::string fromAccount,
                                 CAmount neededPerTicket,
                                 CAmount vspFee = 0,
                                 int numTickets = 1,
@@ -1173,8 +1172,8 @@ public:
        - minConf: Minimum number of block confirmations required
        - ticketAddress: Override the ticket address to which voting rights are given
        - numTickets: The number of tickets to purchase
-       - poolAddress: The address to pay stake pool fees to
-       - poolFeePercent: The percent from the voter subsidy to pay to the stake pool
+       - vspAddress: The address to pay stake pool fees to
+       - vspFeePercent: The percent from the voter subsidy to pay to the stake pool
        - expiry: Height at which the purchase tickets expire
        - feeRate: The transaction fee rate (PAI/kB) to use (overrides current fees if larger than them) (optional, default = -1)
        In case of success, the returned vector contains the transactions hex.
@@ -1184,9 +1183,9 @@ public:
                    CAmount spendLimit,
                    int minConf,
                    std::string ticketAddress,
-                   int numTickets,
-                   std::string poolAddress,
-                   double poolFeePercent,
+                   unsigned int numTickets,
+                   std::string vspAddress,
+                   double vspFeePercent,
                    int64_t expiry,
                    CAmount feeRate = -1);
 

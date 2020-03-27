@@ -3,6 +3,8 @@
 
 #include <string>
 #include "script/pai_data_classifier.h"
+#include "script/standard.h"
+#include "pubkey.h"
 #include "stakenode.h"
 
 class CTransaction;
@@ -40,13 +42,6 @@ struct TicketContribData {
     CAmount contributedAmount;
 };
 
-struct PoolFeeData {
-    int nVersion;
-    uint160 poolAddr;
-    int isScriptHash;  // TODO is there a better way to represent this?
-    CAmount poolFee;
-};
-
 struct VoteData {
     int nVersion;
     uint256 blockHash;
@@ -60,7 +55,6 @@ struct RevokeTicketData {
 
 CScript GetScriptForBuyTicketDecl(const BuyTicketData& data);
 CScript GetScriptForTicketContrib(const TicketContribData& data);
-CScript GetScriptForPoolFee(const PoolFeeData& data);
 CScript GetScriptForVoteDecl(const VoteData& data);
 CScript GetScriptForRevokeTicketDecl(const RevokeTicketData& data);
 
@@ -80,7 +74,6 @@ const uint32_t txdeclOutputIndex = 0;
 const uint32_t ticketStakeOutputIndex = 1;
 const uint32_t ticketContribOutputIndex = 2;
 const uint32_t ticketChangeOutputIndex = 3;
-const uint32_t ticketPoolFeeOutputIndex = 4;
 const uint32_t voteRewardOutputIndex = 1;
 const uint32_t revocationRefundOutputIndex = 1;
 
@@ -98,11 +91,6 @@ const uint32_t voteBitsIndex = 7;
 const uint32_t contribVersionIndex = 3;
 const uint32_t contribAddrIndex = 4;
 const uint32_t contribAmountIndex = 5;
-//---
-const uint32_t poolVersionIndex = 3;
-const uint32_t poolAddrIndex = 4;
-const uint32_t poolIsScriptHashIndex = 5;
-const uint32_t poolFeeIndex = 6;
 
 enum ETxClass {         // these values must not be changed (they are stored in scripts), so only appending is allowed
     TX_Regular,
@@ -113,7 +101,6 @@ enum ETxClass {         // these values must not be changed (they are stored in 
 
 ETxClass ParseTxClass(const CTransaction& tx);
 bool ParseTicketContrib(const CTransaction& tx, uint32_t txoutIndex, TicketContribData& data);
-bool ParsePoolFee(const CTransaction& tx, uint32_t txoutIndex, PoolFeeData& data);
 bool ParseVote(const CTransaction& tx, VoteData& data);
 bool IsStakeTx(ETxClass txClass);
 
@@ -127,7 +114,6 @@ size_t GetEstimatedP2PKHTxInSize(bool compressed = true);
 size_t GetEstimatedP2PKHTxOutSize();
 size_t GetEstimatedBuyTicketDeclTxOutSize();
 size_t GetEstimatedTicketContribTxOutSize();
-size_t GetEstimatedPoolFeeTxOutSize();
 size_t GetEstimatedSizeOfBuyTicketTx(bool useVsp);
 
 // ==============================
