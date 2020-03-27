@@ -1672,7 +1672,7 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
     }
 
     // Calculate the current ticket price.
-    const auto& ticketPrice = calcNextRequiredStakeDifficulty(chainActive.Tip()->GetBlockHeader(), chainActive.Tip(), Params());
+    const auto& ticketPrice = CalculateNextRequiredStakeDifficulty(chainActive.Tip(), Params().GetConsensus());
 
     // Ensure the ticket price does not exceed the spend limit if set.
     if (ticketPrice > spendLimit) {
@@ -1755,11 +1755,9 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
 
         // pool outputs
         if (useVsp) {
-            // TODO: ADD CORRECT ADDRESS AFTER MERGE!!!
-            assert(0);
             // contribution output
             const auto& contributedAmount = vspFee - 0; // input - change
-            TicketContribData ticketContribData = {1, CKeyID(), contributedAmount};
+            TicketContribData ticketContribData{1, vspAddr, contributedAmount};
             CScript contributorInfoScript = GetScriptForTicketContrib(ticketContribData);
             mTicketTx.vout.push_back(CTxOut(0, contributorInfoScript));
 
@@ -1785,7 +1783,7 @@ std::pair<std::vector<std::string>, CWalletError> CWallet::PurchaseTicket(std::s
                 rewardAddress = newKey.GetID();
             }
             const auto& contributedAmount = neededPerTicket - vspFee - 0; // input - change
-            TicketContribData ticketContribData = {1, rewardAddress, contributedAmount};
+            TicketContribData ticketContribData{1, rewardAddress, contributedAmount};
             CScript contributorInfoScript = GetScriptForTicketContrib(ticketContribData);
             mTicketTx.vout.push_back(CTxOut(0, contributorInfoScript));
 

@@ -136,7 +136,7 @@ void CTicketBuyer::mainLoop()
         }
         spendable -= config.maintain;
 
-        sdiff = calcNextRequiredStakeDifficulty(chainActive.Tip()->GetBlockHeader(), chainActive.Tip(), Params());
+        sdiff = CalculateNextRequiredStakeDifficulty(chainActive.Tip(), Params().GetConsensus());
 
         buy = static_cast<int>(spendable / sdiff);
         if (buy == 0) {
