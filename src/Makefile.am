@@ -141,6 +141,8 @@ PAICOIN_CORE_H = \
   script/ismine.h \
   stake/stakepoolfee.cpp \
   stake/stakepoolfee.h \
+  stake/stakeversion.cpp \
+  stake/stakeversion.h \
   streams.h \
   support/allocators/secure.h \
   support/allocators/zeroafterfree.h \
@@ -328,8 +330,6 @@ libpaicoin_consensus_a_SOURCES = \
   stake/stakenode.h \
   stake/staketx.cpp \
   stake/staketx.h \
-  stake/stakeversion.cpp \
-  stake/stakeversion.h \
   tinyformat.h \
   uint256.cpp \
   uint256.h \
